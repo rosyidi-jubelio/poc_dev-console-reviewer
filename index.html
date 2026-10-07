@@ -1,0 +1,703 @@
+<title>Dev Console Review Queue</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,300..900&display=swap">
+<style>
+/* Layout: shell web-developer_console (header putih + sidebar w-64 + app-surface), konten di PageContainer. Light-only, sama seperti Dev Console. */
+:root {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #163a50;
+  --primary: #4b68ef;
+  --primary-fg: #fbfbfb;
+  --muted-foreground: #a8a8a8;
+  --border: #eceff1;
+  --button-muted: #d7d7d7;
+  --app-surface: #f1f9ff;
+  --sidebar-primary: #4b68ef;
+  --sidebar-secondary: #e5f2fb;
+  --neutral-50: #fafafa;
+  --neutral-100: #f5f5f5;
+  --neutral-600: #525252;
+  --neutral-700: #404040;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --blue-100: #dbeafe;
+  --blue-600: #2563eb;
+  --blue-700: #1d4ed8;
+  --success-bg: #dcfce7; --success-border: #86efac; --success-text: #166534;
+  --warning-bg: #fff8e1; --warning-border: #fcd34d; --warning-text: #8a6100;
+  --danger-bg: #fde8e8; --danger-border: #ef4444; --danger-text: #df4d4d;
+  --destructive: #e7000b;
+  --font-sans: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
+  --radius: 0.625rem;
+}
+* { box-sizing: border-box; border-color: var(--border); }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--app-surface); color: var(--foreground); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid rgb(75 104 239 / 0.35); outline-offset: 1px; }
+svg.i { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.shell { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40; background: var(--background); padding-inline: 16px; height: 86px; flex-shrink: 0; box-shadow: 0 4px 20px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.h-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.grip { border: 0; background: none; border-radius: 999px; padding: 2px; display: grid; place-items: center; color: var(--foreground); transition: transform .3s, background .3s; }
+.grip:hover { background: var(--gray-100); transform: translateY(-2px); }
+.grip svg.i { width: 32px; height: 32px; stroke-width: 1.75; }
+.logo { height: 32px; width: 128px; display: block; }
+.env { font-size: 11px; font-weight: 700; color: var(--warning-text); background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: 999px; padding: 1px 10px; }
+.h-right { display: flex; align-items: center; gap: 12px; position: relative; }
+.vsep { width: 1px; height: 48px; background: var(--button-muted); }
+.user-btn { border: 0; background: none; display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border-radius: 6px; }
+.avatar { width: 52px; height: 52px; border-radius: 999px; background: var(--gray-200); display: grid; place-items: center; font-size: 18px; font-weight: 600; overflow: hidden; flex-shrink: 0; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar.sm { width: 44px; height: 44px; }
+.user-btn .chev { opacity: .7; }
+.menu { position: absolute; right: 0; top: calc(100% + 6px); width: 280px; background: var(--background); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); border: 1px solid var(--border); z-index: 50; }
+.menu-head { display: flex; gap: 8px; align-items: center; padding: 12px 16px 8px; }
+.menu-head h5 { margin: 0; font-size: 12px; font-weight: 700; }
+.menu-head span { font-size: 12px; color: var(--muted-foreground); overflow-wrap: anywhere; }
+.menu-body { padding: 4px 16px 16px; display: grid; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px; }
+.menu-body label { font-size: 12px; font-weight: 600; }
+
+.frame { display: flex; flex: 1; overflow: hidden; }
+aside { width: 256px; background: var(--background); overflow-y: auto; display: none; flex-shrink: 0; }
+aside nav { padding: 24px 16px; display: grid; gap: 4px; align-content: start; width: 100%; }
+.nav-item { display: flex; align-items: center; gap: 12px; border-radius: 4px; padding: 8px 12px; font-size: 14px; color: var(--foreground); }
+.nav-item svg.i { width: 18px; height: 18px; }
+.nav-item.static { opacity: .55; cursor: default; }
+.nav-item.active { background: var(--sidebar-primary); color: var(--primary-fg); font-weight: 500; }
+main { flex: 1; overflow-y: auto; padding: 16px; }
+@media (min-width: 768px) { main { padding: 24px; } }
+@media (min-width: 1024px) { aside { display: flex; } header { padding-inline: 42px; } .logo { height: 40px; width: 144px; } .grip svg.i { width: 40px; height: 40px; } }
+
+.page { background: var(--background); border-radius: 6px; min-height: 100%; display: flex; flex-direction: column; padding: 24px; }
+@media (max-width: 640px) { .page { padding: 16px; } }
+.page-head { padding-top: 20px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+.page-head h1 { margin: 0; font-size: 30px; line-height: 1.2; font-weight: 700; text-wrap: balance; }
+.page-head p { margin: 0; color: var(--neutral-600); }
+.sep { height: 1px; background: var(--border); margin-top: 16px; }
+.page-body { margin-top: 16px; padding-bottom: 32px; display: flex; flex-direction: column; gap: 16px; }
+
+.alert { display: flex; gap: 12px; border: 1px solid var(--warning-border); background: var(--warning-bg); border-radius: 8px; padding: 12px 16px; align-items: flex-start; }
+.alert svg.i { color: #e0a800; margin-top: 2px; width: 20px; height: 20px; }
+.alert b { display: block; }
+.alert .lnk { color: var(--primary); font-weight: 700; background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 3px; }
+
+.tabs { width: 100%; border-block: 1px solid var(--gray-200); background: var(--background); overflow-x: auto; }
+.tabs-in { display: flex; min-width: max-content; }
+.tab { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 64px; min-width: 120px; padding: 16px; font-size: 16px; font-weight: 400; color: var(--foreground); background: none; border: 0; transition: color .2s; }
+.tab:hover { color: var(--primary); }
+.tab::after { content: ""; position: absolute; inset: auto 0 0 0; height: 4px; border-radius: 999px 999px 0 0; background: transparent; }
+.tab[aria-selected="true"] { color: var(--primary); font-weight: 500; }
+.tab[aria-selected="true"]::after { background: var(--primary); }
+.tab-count { display: inline-flex; min-width: 24px; justify-content: center; border-radius: 6px; background: var(--blue-100); color: var(--blue-700); font-size: 12px; font-weight: 600; padding: 1px 6px; font-variant-numeric: tabular-nums; }
+
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.tb-left, .tb-right { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.search { position: relative; width: 100%; }
+@media (min-width: 640px) { .search { width: 288px; } }
+.search svg.i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted-foreground); }
+.input { width: 100%; height: 40px; border: 1px solid var(--border); border-radius: 6px; padding: 0 12px; background: var(--background); font-size: 14px; transition: border-color .2s; }
+.input::placeholder, .textarea::placeholder { color: #bdbdbd; }
+.input:focus, .textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgb(75 104 239 / 0.15); }
+.search .input { padding-left: 36px; }
+.textarea { width: 100%; min-height: 110px; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; resize: vertical; font-size: 14px; }
+
+.filter { position: relative; }
+.filter-btn { display: flex; align-items: center; gap: 8px; height: 40px; border: 1px solid var(--border); background: var(--background); padding: 0 14px; border-radius: 6px; font-size: 14px; }
+.filter-btn:hover { background: var(--neutral-50); }
+.filter-btn svg.i { color: var(--muted-foreground); }
+.filter-btn.on { border-color: rgb(75 104 239 / 0.5); color: var(--primary); font-weight: 500; }
+.filter-dot { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 999px; background: rgb(75 104 239 / 0.1); color: var(--primary); font-size: 12px; font-weight: 600; }
+.pop { position: absolute; left: 0; top: calc(100% + 4px); width: 240px; background: var(--background); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); padding: 6px; z-index: 30; }
+.pop-label { padding: 6px 8px; font-size: 12px; font-weight: 500; color: var(--muted-foreground); border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.pop-opt { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; border-radius: 6px; padding: 6px 8px; text-align: left; font-size: 13px; }
+.pop-opt:hover { background: var(--neutral-100); }
+.radio { width: 16px; height: 16px; border-radius: 999px; border: 1px solid var(--button-muted); display: grid; place-items: center; flex-shrink: 0; }
+.pop-opt[aria-checked="true"] .radio { border-color: var(--primary); }
+.pop-opt[aria-checked="true"] .radio::after { content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--primary); }
+
+.icon-btn { width: 36px; height: 36px; display: grid; place-items: center; border: 0; background: none; border-radius: 999px; color: var(--foreground); }
+.icon-btn:hover { background: var(--neutral-100); }
+.icon-btn svg.i { width: 18px; height: 18px; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.vsep-sm { width: 1px; height: 20px; background: var(--border); }
+.total { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.total-n { display: inline-flex; min-width: 32px; justify-content: center; border-radius: 6px; background: var(--blue-100); color: var(--blue-700); font-size: 12px; font-weight: 600; padding: 2px 8px; font-variant-numeric: tabular-nums; }
+
+.card { overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--background); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+thead tr { border-bottom: 1px solid var(--border); background: rgb(250 250 250 / 0.75); }
+th { padding: 16px 24px; font-size: 12px; font-weight: 600; color: var(--neutral-600); white-space: nowrap; }
+td { padding: 16px 24px; border-top: 1px solid var(--border); vertical-align: middle; }
+tbody tr:first-child td { border-top: 0; }
+tbody tr { transition: background .15s; }
+tbody tr:hover { background: rgb(250 250 250 / 0.75); }
+.c { text-align: center; } .r { text-align: right; }
+.app-cell { display: flex; align-items: center; gap: 12px; min-width: 220px; }
+.app-logo { width: 32px; height: 32px; border-radius: 8px; object-fit: cover; background: var(--gray-200); flex-shrink: 0; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--neutral-600); }
+.app-name { font-weight: 600; color: var(--primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-sub { font-size: 12px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--muted-foreground); white-space: nowrap; }
+.mono.fg { color: var(--foreground); }
+.date { font-size: 12px; color: var(--muted-foreground); white-space: nowrap; }
+.wait { font-size: 12px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.wait.old { color: var(--danger-text); }
+.done { font-size: 12px; color: var(--muted-foreground); }
+.actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+.badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.badge i { display: inline-block; width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; height: 40px; border-radius: 6px; font-size: 14px; font-weight: 400; white-space: nowrap; border: 1px solid transparent; transition: all .2s; }
+.btn:hover:not(:disabled) { opacity: .9; transform: translateY(-2px); }
+.btn:disabled { cursor: not-allowed; }
+.btn-sm { height: 35px; font-size: 12px; padding: 0 12px; }
+.btn-primary { background: var(--primary); color: var(--primary-fg); }
+.btn-primary:disabled { background: var(--button-muted); color: var(--muted-foreground); }
+.btn-outline { border-color: var(--button-muted); background: transparent; color: var(--foreground); }
+.btn-outline:hover:not(:disabled) { border-color: rgb(75 104 239 / 0.5); background: rgb(75 104 239 / 0.2); color: var(--primary); opacity: 1; }
+.btn-outline:disabled { color: var(--muted-foreground); }
+.btn-destructive { background: var(--destructive); color: #fff; }
+.btn-destructive:disabled { background: var(--button-muted); color: var(--muted-foreground); }
+
+.pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; border-top: 1px solid var(--border); padding: 12px 16px; font-size: 12px; color: var(--muted-foreground); }
+.pager-l, .pager-m, .pager-r { display: flex; align-items: center; gap: 8px; }
+.pager-m { gap: 4px; }
+.pager .lbl { font-size: 14px; font-weight: 500; color: var(--foreground); white-space: nowrap; }
+.pg-size { height: 32px; border: 1px solid var(--border); border-radius: 6px; padding: 0 8px; font-size: 14px; font-weight: 500; background: var(--background); }
+.pg-btn { width: 32px; height: 32px; border-radius: 999px; border: 0; background: none; color: var(--muted-foreground); display: grid; place-items: center; font-size: 12px; }
+.pg-btn:hover:not(:disabled) { background: var(--neutral-100); }
+.pg-btn:disabled { opacity: .3; cursor: not-allowed; }
+.pg-num { color: var(--neutral-700); }
+.pg-num[aria-current="page"] { background: var(--blue-600); color: #fff; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.pg-go { width: 56px; height: 32px; border: 1px solid var(--border); border-radius: 6px; text-align: center; font-size: 14px; font-weight: 500; }
+
+.state { display: grid; justify-items: center; gap: 8px; padding: 56px 24px; text-align: center; }
+.state svg.big { width: 96px; height: 96px; }
+.state h3 { margin: 0; font-size: 18px; font-weight: 700; }
+.state p { margin: 0; color: var(--neutral-600); max-width: 48ch; }
+.state.err h3, .state.err svg.big { color: var(--danger-text); }
+.loading { display: grid; place-items: center; height: 256px; }
+.spinner { width: 32px; height: 32px; color: var(--primary); }
+
+.overlay { position: fixed; inset: 0; z-index: 60; background: rgb(22 58 80 / 0.45); display: grid; place-items: center; padding: 16px; }
+.dialog { width: 100%; max-width: 400px; background: var(--background); border-radius: 12px; padding: 24px; display: grid; gap: 16px; box-shadow: 0 0 0 1px rgb(22 58 80 / 0.1); animation: zoom .1s ease-out; }
+@keyframes zoom { from { opacity: 0; transform: scale(.95); } }
+@media (prefers-reduced-motion: reduce) { .dialog, .spin { animation: none; } .btn:hover:not(:disabled) { transform: none; } }
+.dlg-head { display: grid; justify-items: center; gap: 6px; text-align: center; padding-block: 8px; }
+.dlg-media { width: 50px; height: 50px; display: grid; place-items: center; margin-bottom: 4px; }
+.dlg-media svg.i { width: 50px; height: 50px; stroke-width: 1.5; }
+.dlg-head h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.dlg-head p { margin: 0; font-size: 14px; text-wrap: balance; }
+.dlg-target { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--neutral-50); display: grid; gap: 2px; }
+.dlg-target b { overflow-wrap: anywhere; }
+.field { display: grid; gap: 6px; }
+.field label { font-size: 14px; font-weight: 600; }
+.field label span { color: #ef4444; }
+.hint { font-size: 12px; color: var(--muted-foreground); }
+.err-text { font-size: 12px; color: var(--danger-text); }
+.dlg-foot { margin: 0 -24px -24px; padding: 16px; border-top: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-radius: 0 0 12px 12px; }
+
+.toast { position: fixed; right: 24px; top: calc(100px + env(safe-area-inset-top, 0px)); z-index: 70; display: flex; gap: 10px; align-items: center; border-radius: 8px; border: 1px solid; padding: 12px 16px; font-size: 14px; font-weight: 600; max-width: calc(100vw - 32px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+.toast.ok { background: var(--success-bg); border-color: var(--success-border); color: var(--success-text); }
+.toast.bad { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger-text); }
+@media (max-width: 640px) { .hide-sm { display: none; } th, td { padding: 12px 16px; } .toast { right: 16px; } .user-name { display: none; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="19" cy="5" r="1"/><circle cx="5" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="12" cy="19" r="1"/><circle cx="19" cy="19" r="1"/><circle cx="5" cy="19" r="1"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></symbol>
+  <symbol id="i-apps" viewBox="0 0 24 24"><circle cx="10" cy="7" r="4"/><path d="M10.3 15H7a4 4 0 0 0-4 4v2"/><circle cx="17" cy="17" r="3"/><path d="m21 21-1.9-1.9"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-lleft" viewBox="0 0 24 24"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></symbol>
+  <symbol id="i-rright" viewBox="0 0 24 24"><path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
+  <symbol id="i-loader" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.22-8.56"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+</svg>
+
+<div class="shell">
+  <header>
+    <div class="h-left">
+      <button class="grip" type="button" aria-label="Menu aplikasi"><svg class="i"><use href="#i-grip"/></svg></button>
+      <img class="logo" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgwIiBoZWlnaHQ9IjQyIiB2aWV3Qm94PSIwIDAgMTgwIDQyIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8dGl0bGU+SnViZWxpbyBEZXYgQ29uc29sZSBMb2dvPC90aXRsZT4KPHBhdGggZD0iTTI3LjQ1MDggMzIuMjg4NlYzMi4yNTI4QzI1LjY4MTIgMzEuOTQ4OSAyNC4wMTg4IDMxLjMxNzMgMjIuNTQxMSAzMC40MTE3QzE4LjU0ODkgMjcuOTYyOCAxNS44Nzk2IDIzLjU1OTUgMTUuODc5NiAxOC41NDI2QzE1Ljg3OTYgMTUuNzQyMSAxNi43MTM4IDEzLjEzMjMgMTguMTQzOCAxMC45NDU2QzE4LjM2NDMgMTAuNjExOSAxOC41OTA2IDEwLjI5MDIgMTguODQwOSA5Ljk4MDMxQzE5LjkzMTMgOC41ODYwNyAyMS4yNzc5IDcuNDEyMjcgMjIuODE1MiA2LjUxMjUxQzIxLjg5MTYgNi4wNzc1OCAyMC45MjA0IDUuNzMxOTcgMTkuOTA3NSA1LjQ4MTczQzE5LjAwMTggNS4yNTUyOSAxOC4wNjYzIDUuMTEyMzEgMTcuMTA3IDUuMDQ2NzVDMTUuNjExNSA2LjQ1ODkgMTQuMzQyMyA4LjEwOTM5IDEzLjM3NzEgOS45NDQ1NkMxMi4wMjQ1IDEyLjUxMjcgMTEuMjU1OSAxNS40MzIzIDExLjI1NTkgMTguNTM2NkMxMS4yNTU5IDI0LjAyNDMgMTMuNjU3MSAyOC45NTc4IDE3LjQ1ODUgMzIuMzYwMUMxNy40OTQzIDMyLjM4OTkgMTcuNTMwMSAzMi40MTk2IDE3LjU2NTggMzIuNDQ5NEMxOS4wNTU0IDMzLjc2MDMgMjAuNzUzNiAzNC44Mzg4IDIyLjYwMDcgMzUuNjE5M0wyMi42NDgzIDM1LjYzNzJIMjIuNjU0M0wyMi42ODQxIDM1LjY0OTFDMjQuODU4OSAzNi41NTQ4IDI3LjI0MjIgMzcuMDYxMiAyOS43Mzg4IDM3LjA2NzJIMjkuNzkyNEgyOS44NDYxQzMyLjA3NDUgMzcuMDY3MiAzMi4wNzQ1IDM0Ljg5MjQgMzIuMDc0NSAzNC44OTI0VjMyLjc5NUMzMi4wODA1IDMyLjU3NDYgMzIuMDc0NSAzMi40NDk0IDMyLjA3NDUgMzIuNDQ5NEgyOS43OTI0QzI4LjkwNDYgMzIuNDQzNSAyOC4wODgzIDMyLjM1NDEgMjcuNDUwOCAzMi4yNDY5VjMyLjI4ODZaIiBmaWxsPSIjRUFCODFGIi8+CjxwYXRoIGQ9Ik0yOS43MDg2IDM3LjA3MzJIMjkuODQ1NkMzMi4wNzQgMzcuMDczMiAzMi4wNzQxIDM0Ljg5ODMgMzIuMDc0MSAzNC44OTgzVjMyLjgwMUMzMi4wODAxIDMyLjU4MDUgMzIuMDc0MSAzMi40NTU0IDMyLjA3NDEgMzIuNDU1NFYyNC4wNTRDMzEuNDI0NiAyNC41MzA3IDMwLjYyMDIgMjQuODE2NyAyOS43NTYyIDI0LjgxNjdDMjguODk4MiAyNC44MTY3IDI4LjA5OTggMjQuNTM2NyAyNy40NTAzIDI0LjA2NlYzMi4yNDY4VjMyLjQ0OTRIMjQuMDk1OEgxNy41NjU0SDE2LjA0QzkuNzQ3OTUgMzIuNDQ5NCA0LjYyOTY4IDI3LjMzMTIgNC42Mjk2OCAyMS4wMzkxQzQuNjI5NjggMTUuNjY0NiA4LjM3MTU2IDExLjE0MjIgMTMuMzgyNiA5Ljk0NDU0QzE0LjIzNDYgOS43NDE5NSAxNS4xMjg0IDkuNjI4NzMgMTYuMDQgOS42Mjg3M0MxNi44MDI3IDkuNjI4NzMgMTcuNTQ3NSA5LjcwNjE5IDE4LjI2ODQgOS44NDkyMkMxOC40NTkxIDkuODg0OTggMTguNjU1OCA5LjkzMjYzIDE4Ljg0NjQgOS45ODAyOUMxOS45MzY4IDguNTg2MDUgMjEuMjgzNCA3LjQxMjI0IDIyLjgyMDcgNi41MTI0OUMyMS44OTcxIDYuMDc3NTYgMjAuOTI1OSA1LjczMTk1IDE5LjkxMyA1LjQ4MTcxQzE5LjAwNzMgNS4yNTUyNyAxOC4wNzE5IDUuMTEyMjkgMTcuMTEyNSA1LjA0NjczQzE2Ljc2MSA1LjAyMjkzIDE2LjQwMzUgNS4wMDUwMiAxNi4wNDYgNS4wMDUwMkM3LjE5Nzc2IDQuOTk5MDcgMCAxMi4xOTY4IDAgMjEuMDM5MUMwIDI5Ljg4MTQgNy4xOTc3NiAzNy4wNzMyIDE2LjA0IDM3LjA3MzJIMjkuNzA4NloiIGZpbGw9IiM0REFDRTAiLz4KPHBhdGggZD0iTTI5Ljc1NjMgMjMuMTg0MUMzMS4wMzMxIDIzLjE4NDEgMzIuMDY4MiAyMi4xNDkgMzIuMDY4MiAyMC44NzIyQzMyLjA2ODIgMTkuNTk1NCAzMS4wMzMxIDE4LjU2MDQgMjkuNzU2MyAxOC41NjA0QzI4LjQ3OTUgMTguNTYwNCAyNy40NDQ0IDE5LjU5NTQgMjcuNDQ0NCAyMC44NzIyQzI3LjQ0NDQgMjIuMTQ5IDI4LjQ3OTUgMjMuMTg0MSAyOS43NTYzIDIzLjE4NDFaIiBmaWxsPSIjNERBQ0UwIi8+CjxwYXRoIGQ9Ik00MS40NDA3IDEwLjkzOTZDNDEuMDU5MyA0Ljg0NDE4IDM1Ljk4MjggMCAyOS43OTIgMEMyNC44ODgyIDAgMjAuNDI1NCAxLjkxODYxIDE3LjEwNjYgNS4wNDA4M0MxOC4wNjU5IDUuMTA2MzQgMTkuMDAxMyA1LjI0OTM3IDE5LjkwNyA1LjQ3NTc2QzIwLjkxNCA1LjcyNiAyMS44OTEyIDYuMDc3NTYgMjIuODE0NyA2LjUwNjU5QzI0Ljg3MDQgNS4zMDg5MyAyNy4yNTM3IDQuNjIzNzIgMjkuNzkyIDQuNjIzNzJDMjkuOTc2NyA0LjYyMzcyIDMwLjE2MTQgNC42MzU2MyAzMC4zNDAyIDQuNjQxNkMzMy45NzQ4IDQuOTIxNjYgMzYuODQwOCA3Ljk2NjM5IDM2Ljg0MDggMTEuNjY2NUMzNi44NDA4IDE0LjU2MjMgMzUuMDgzMSAxNy4wNDcgMzIuNTg2NSAxOC4xMzE0QzMzLjI3MTcgMTguODQwNCAzMy42OTQ4IDE5LjgwNTcgMzMuNjk0OCAyMC44NjYzQzMzLjY5NDggMjEuNTg3MyAzMy40OTgxIDIyLjI2MDYgMzMuMTU4NSAyMi44Mzg1QzMzLjM4NDkgMjIuNzczIDMzLjYwNTQgMjIuNzAxNSAzMy44MjU4IDIyLjYxODFDMzguMDg2MSAyMS4wNDUxIDQxLjE4NDUgMTcuMDUyOSA0MS40NDY2IDEyLjMxNkM0MS40NTg1IDEyLjEwMTUgNDEuNDY0NSAxMS44ODExIDQxLjQ2NDUgMTEuNjY2NUM0MS40NjQ1IDExLjQyMjIgNDEuNDUyNiAxMS4xNzggNDEuNDQwNyAxMC45Mzk2WiIgZmlsbD0iI0VBQjgxRiIvPgo8cGF0aCBkPSJNNDYuODI3MSAxMS4yMjU2QzQzLjk4NDkgNC42Mjk2OCAzNy40MTg4IDAgMjkuNzkyIDBDMjQuODg4MiAwIDIwLjQyNTQgMS45MTg2MSAxNy4xMDY2IDUuMDQwODNDMTguMDY1OSA1LjEwNjM0IDE5LjAwMTMgNS4yNDkzNyAxOS45MDcgNS40NzU3NkMyMC45MTQgNS43MjYgMjEuODkxMiA2LjA3NzU2IDIyLjgxNDcgNi41MDY1OUMyNC44NzA0IDUuMzA4OTMgMjcuMjUzNyA0LjYyMzcyIDI5Ljc5MiA0LjYyMzcyQzM0LjY2IDQuNjIzNzIgMzguOTU2IDcuMTM4MTUgNDEuNDQwNyAxMC45Mzk2QzQxLjY3OSAxMS4zMDMxIDQxLjg5OTQgMTEuNjcyNSA0Mi4xMDIgMTIuMDUzOUM0Mi44MTcxIDEzLjQwNjQgNDMuMzE3NSAxNC44ODQxIDQzLjU0OTkgMTYuNDUxMUM0NC41MDkyIDE2LjA2MzkgNDUuNTU3OSAxNS44NDM0IDQ2LjY2MDIgMTUuODQzNEM0Ny4xNjY3IDE1Ljg0MzQgNDcuNjY3MiAxNS44OTExIDQ4LjE0OTggMTUuOTgwNEM0Ny45MTc0IDE0LjMxOCA0Ny40NzA2IDEyLjcyMTIgNDYuODI3MSAxMS4yMjU2WiIgZmlsbD0iI0U0NzQyNSIvPgo8cGF0aCBkPSJNNDYuODI3IDExLjIyNTZDNDYuNzczNCAxMS4yMjU2IDQ2LjcxOTggMTEuMjE5NiA0Ni42NjAyIDExLjIxOTZDNDUuMDU3NCAxMS4yMTk2IDQzLjUyMDEgMTEuNTE3NSA0Mi4xMDIgMTIuMDUzOEM0Mi44MTcgMTMuNDA2MyA0My4zMTc1IDE0Ljg4NCA0My41NDk5IDE2LjQ1MTFDNDQuNTA5MiAxNi4wNjM4IDQ1LjU1NzkgMTUuODQzMyA0Ni42NjAyIDE1Ljg0MzNDNDcuMTY2NyAxNS44NDMzIDQ3LjY2NzIgMTUuODkxIDQ4LjE0OTggMTUuOTgwNEM1Mi4wMTcgMTYuNjgzNSA1NC45NjA1IDIwLjA3OTggNTQuOTYwNSAyNC4xNDM0QzU0Ljk2MDUgMjguNzE5NCA1MS4yMzYxIDMyLjQ0MzQgNDYuNjYwMiAzMi40NDM0SDQyLjAyNDZIMzYuNzYzM0gyOS44NDU2VjM2Ljc2MzNWMzcuMDczMUg0Ni42NjAyQzUzLjc4NjMgMzcuMDczMSA1OS41ODM5IDMxLjI3NTYgNTkuNTgzOSAyNC4xNDkzQzU5LjU4MzkgMTcuMDc2NyA1My44NzU2IDExLjMxNDkgNDYuODI3IDExLjIyNTZaIiBmaWxsPSIjREUxQTU2Ii8+CjxwYXRoIGQ9Ik00Mi4xMDE2IDEyLjA1MzhDNDIuODE2NiAxMy40MDYzIDQzLjMxNzEgMTQuODg0IDQzLjU0OTUgMTYuNDUxMUM0NC41MDg4IDE2LjA2MzggNDUuNTU3NSAxNS44NDMzIDQ2LjY1OTggMTUuODQzM0M0Ny4xNjYyIDE1Ljg0MzMgNDcuNjY2NyAxNS44OTEgNDguMTQ5NCAxNS45ODA0QzQ3LjkxNyAxNC4zMTc5IDQ3LjQ3MDEgMTIuNzIxMSA0Ni44MjY2IDExLjIyNTZDNDYuNzczIDExLjIyNTYgNDYuNzE5MyAxMS4yMTk2IDQ2LjY1OTggMTEuMjE5NkM0NS4wNTY5IDExLjIyNTYgNDMuNTE5NyAxMS41MTc1IDQyLjEwMTYgMTIuMDUzOFoiIGZpbGw9IiNDQjI2MjciLz4KPHBhdGggZD0iTTI5Ljc5MjMgMEMyNC44ODg2IDAgMjAuNDI1NyAxLjkxODYxIDE3LjEwNjkgNS4wNDA4M0MxNS42MTEzIDYuNDUyOTMgMTQuMzQyMiA4LjEwMzQyIDEzLjM3NyA5LjkzODYzQzE0LjIyOSA5LjczNjA1IDE1LjEyMjggOS42MjI4MyAxNi4wMzQ0IDkuNjIyODNDMTYuNzk3MSA5LjYyMjgzIDE3LjU0MTggOS43MDAyOSAxOC4yNjI4IDkuODQzMjdDMTguNDUzNSA5Ljg3OTAyIDE4LjY1MDEgOS45MjY2OCAxOC44NDA4IDkuOTc0MzRDMTkuOTMxMSA4LjU4MDEgMjEuMjc3OCA3LjQwNjI5IDIyLjgxNTEgNi41MDY1OUMyNC44NzA3IDUuMzA4OTMgMjcuMjU0IDQuNjIzNzIgMjkuNzkyMyA0LjYyMzcyQzM0LjY2MDMgNC42MjM3MiAzOC45NTY0IDcuMTQ0MSA0MS40NDEgMTAuOTM5NkM0MS4wNTk2IDQuODQ0MTggMzUuOTgzMSAwIDI5Ljc5MjMgMFoiIGZpbGw9IiNDNTY0MjgiLz4KPHBhdGggZD0iTTE4Ljg0MDggOS45NzQzM0MyMC4yNzA4IDEwLjMzNzggMjEuNTg3NiAxMC45Njk0IDIyLjc0OTUgMTEuODE1NUMyNC44MTExIDEzLjMyMyAyNi4zNTQzIDE1LjQ5NzcgMjcuMDQ1NSAxOC4wMjQxQzI3Ljc1NDYgMTcuMzUwOCAyOC43MDc5IDE2LjkzMzcgMjkuNzU2NiAxNi45MzM3QzMwLjQ0NzcgMTYuOTMzNyAzMS4wOTEyIDE3LjExMjUgMzEuNjU3MyAxNy40MjIzQzMwLjY2MjMgMTMuMTMyMyAyNy45NTEyIDkuNDk3NjUgMjQuMjgwOCA3LjI4NzExQzIzLjgxMDEgNy4wMDEwNiAyMy4zMTU1IDYuNzQ0ODcgMjIuODE1MSA2LjUwNjUzQzIxLjg5MTUgNi4wNzE1NSAyMC45MjAzIDUuNzI1OTkgMTkuOTA3MyA1LjQ3NTc1QzE5LjAwMTcgNS4yNDkzMSAxOC4wNjYyIDUuMTA2MzMgMTcuMTA2OSA1LjA0MDc3QzE1LjYxMTMgNi40NTI5MiAxNC4zNDIyIDguMTAzNDEgMTMuMzc3IDkuOTM4NThDMTQuMjI5IDkuNzM1OTkgMTUuMTIyOCA5LjYyMjc3IDE2LjAzNDQgOS42MjI3N0MxNi43OTcxIDkuNjIyNzcgMTcuNTQxOCA5LjcwMDIzIDE4LjI2MjggOS44NDMyNkMxOC40NTk0IDkuODc5MDIgMTguNjUwMSA5LjkyNjY3IDE4Ljg0MDggOS45NzQzM1oiIGZpbGw9IiM3REI5NDIiLz4KPHBhdGggZD0iTTE5LjkwNzMgNS40NzU3NUMxOS4wMDE3IDUuMjQ5MzEgMTguMDY2MiA1LjEwNjMzIDE3LjEwNjkgNS4wNDA3N0MxNS42MTEzIDYuNDUyOTIgMTQuMzQyMiA4LjEwMzQxIDEzLjM3NyA5LjkzODU4QzE0LjIyOSA5LjczNTk5IDE1LjEyMjggOS42MjI3NyAxNi4wMzQ0IDkuNjIyNzdDMTYuNzk3MSA5LjYyMjc3IDE3LjU0MTggOS43MDAyMyAxOC4yNjI4IDkuODQzMjZDMTguNDUzNSA5Ljg3OTAyIDE4LjY1MDEgOS45MjY2NyAxOC44NDA4IDkuOTc0MzNDMTkuOTMxMSA4LjU4MDA0IDIxLjI3NzggNy40MDYyMyAyMi44MTUxIDYuNTA2NTNDMjEuODkxNSA2LjA3MTU1IDIwLjkyMDMgNS43MjU5OSAxOS45MDczIDUuNDc1NzVaIiBmaWxsPSIjODI5MzNBIi8+CjxwYXRoIGQ9Ik0zMi4wNzQxIDMyLjQ0OTVIMjQuMTAxOEgxNy41NjU0QzE5LjA1NSAzMy43NjAzIDIwLjc1MzEgMzQuODM4OCAyMi42MDAyIDM1LjYxOTNMMjIuNjQ3OSAzNS42MzcySDIyLjY1MzlMMjIuNjgzNiAzNS42NDkxQzI0Ljg1ODQgMzYuNTU0OCAyNy4yNDE4IDM3LjA2MTMgMjkuNzM4NCAzNy4wNjcySDI5Ljc5MkgyOS44NDU2QzMyLjA3NDEgMzcuMDY3MiAzMi4wNzQxIDM0Ljg5MjQgMzIuMDc0MSAzNC44OTI0VjMyLjc5NUMzMi4wODAxIDMyLjU4MDUgMzIuMDc0MSAzMi40NDk1IDMyLjA3NDEgMzIuNDQ5NVoiIGZpbGw9IiM2MjY5OTgiLz4KPHBhdGggZD0iTTI3LjQ1MDQgMzIuMjQ2OFYzMi4yODI1VjMyLjQ0MzRIMjkuODQ1NkMyOC45Mzk5IDMyLjQ0OTQgMjguMDk5OCAzMi4zNiAyNy40NTA0IDMyLjI0NjhaIiBmaWxsPSIjMDI5QjlCIi8+CjxwYXRoIGQ9Ik03Ni41NjM4IDEuNDYyNTZDNzYuNTYzOCAtMC40NTg0MjYgNzkuNTgzOCAtMC40NTg0MjYgNzkuNTgzOCAxLjQ2MjU2VjEwLjQ5MDFDNzkuNTgzOCAxNC4wNzY2IDc3Ljg3NCAxNi4yNDE5IDczLjkyMDggMTYuMjQxOUM3MS45Nzc5IDE2LjI0MTkgNzAuMzU2NCAxNS43MiA2OC45MzU1IDEzLjg4NzlDNjcuNzY5MSAxMi40OTk5IDY5Ljk2ODIgMTAuNDc5IDcxLjE1NiAxMS45NDQ3QzcyLjExMTEgMTMuMTMyOCA3My4xNDM4IDEzLjQxMDQgNzQuMTU0IDEzLjM2NkM3NS40MzExIDEzLjMyMTYgNzYuNTUyNiAxMi43NDQxIDc2LjU3NSAxMC40OTAxTDc2LjU2MzggMS40NjI1NloiIGZpbGw9IiMxNjNBNTAiLz4KPHBhdGggZD0iTTk1LjM2NTcgMS41ODcwOUM5NS4zNjU3IC0wLjQ0NDkzMSA5OC4zNTI2IC0wLjYxMTQ5MyA5OC4zNTI2IDEuNTg3MDlWOS44NTk1NEM5OC4zNTI2IDE4LjM5ODUgODQuNTgzOCAxOC4zOTg1IDg0LjU4MzggOS44NTk1NFYxLjU4NzA5Qzg0LjU4MzggLTAuNDY3MTM5IDg3LjU4MTggLTAuNTU1OTcxIDg3LjU4MTggMS41ODcwOVY5Ljg1OTU0Qzg3LjU4MTggMTQuMzU2NiA5NS4zNjU3IDE0LjYzNDIgOTUuMzY1NyA5Ljg1OTU0VjEuNTg3MDlaIiBmaWxsPSIjMTYzQTUwIi8+CjxwYXRoIGQ9Ik0xMDQuNzQxIDE2LjIwNDRDMTAzLjkxOSAxNi4yMDQ0IDEwMy4zNTMgMTUuNTkzNyAxMDMuMzUzIDE0Ljc4MzJWMS40ODA2MUMxMDMuMzUzIDAuNjU4OTI1IDEwMy45MTkgMC4wNTkzMTA5IDEwNC43NDEgMC4wNTkzMTA5SDExMS4xNTlDMTE0LjE1NyAwLjA1OTMxMDkgMTE1Ljc3OCAyLjA5MTMzIDExNS43NzggNC40MjMxNkMxMTUuNzc4IDUuNDU1ODUgMTE1LjQ3OCA2LjQ1NTE2IDExNC41MjMgNy4yOTkwN0MxMTYuMzMzIDguMDA5NzUgMTE3LjEzMyA5LjM5Nzc1IDExNy4xMzMgMTEuMDk2NkMxMTcuMTMzIDEzLjcyODMgMTE1LjM1NiAxNi4yMDQ0IDExMS45MjUgMTYuMjA0NEgxMDQuNzQxWk0xMTEuMTcgMi44NTc1MUgxMDYuMzUxVjYuMjY2NDNIMTExLjE3QzExMi4xNTggNi4yNjY0MyAxMTIuNzY5IDUuNjU1NyAxMTIuNzY5IDQuNDM0MjZDMTEyLjc0NyAzLjU1NzA1IDExMi4wMzYgMi44NTc1MSAxMTEuMTcgMi44NTc1MVpNMTA2LjMzOSAxMy40MTc0SDExMS45MTRDMTE0LjU2OCAxMy40MTc0IDExNC41NjggOS4wNDIzOCAxMTEuOTE0IDkuMDQyMzhIMTA2LjMzOVYxMy40MTc0WiIgZmlsbD0iIzE2M0E1MCIvPgo8cGF0aCBkPSJNMTMyLjEzOCAxMy4yMjMzSDEyNS4xNzZWMy4wNDA5OEgxMzEuNzQ5QzEzMy44MDMgMy4wNDA5OCAxMzMuODQ4IDAuMDY1MTI2OSAxMzEuNzQ5IDAuMDY1MTI2OUgxMjMuNTQzQzEyMi43NzcgMC4wNDI5MTg5IDEyMi4xNDQgMC42NDI1MjkgMTIyLjEzMyAxLjQwODdDMTIyLjEzMyAxLjQzMDkxIDEyMi4xMzMgMS40NTMxMiAxMjIuMTMzIDEuNDc1MzNWMTQuNzg5QzEyMi4xMjIgMTUuNTU1MSAxMjIuNzMzIDE2LjE4OCAxMjMuNDk5IDE2LjE5OTJDMTIzLjUxIDE2LjE5OTIgMTIzLjUzMiAxNi4xOTkyIDEyMy41NDMgMTYuMTk5MkgxMzIuMTM4QzEzNC4zOCAxNi4yMTAyIDEzNC4yMTQgMTMuMjIzMyAxMzIuMTM4IDEzLjIyMzNaIiBmaWxsPSIjMTYzQTUwIi8+CjxwYXRoIGQ9Ik0xMzguNzU4IDEuNDM2MjVDMTM4Ljc4IDAuNjU4OTc0IDEzOS40MjQgMC4wMzcxNTM2IDE0MC4yMDEgMC4wNDgyNTc0QzE0MC45MzQgMC4wNDgyNTc0IDE0MS41NDUgMC42OTIyODYgMTQxLjU0NSAxLjQzNjI1VjEzLjIxNzVIMTQ3Ljc2M0MxNTAuMDA2IDEzLjIxNzUgMTUwLjA1MSAxNi4yMTU2IDE0Ny43NjMgMTYuMjE1NkgxNDAuMjAxQzEzOS40MDIgMTYuMjE1NiAxMzguNzU4IDE1LjY0OTMgMTM4Ljc1OCAxNC44Mjc2VjEuNDM2MjVaIiBmaWxsPSIjMTYzQTUwIi8+CjxwYXRoIGQ9Ik0xNTQuNDYyIDEuNDY1MzZDMTU0LjQ2MiAtMC40MTEyMTMgMTU3LjQ4MyAtMC40Nzc4MzUgMTU3LjQ4MyAxLjQ2NTM2VjE0Ljc5MDFDMTU3LjQ4MyAxNi42ODg5IDE1NC40NjIgMTYuNzMzMyAxNTQuNDYyIDE0Ljc5MDFWMS40NjUzNloiIGZpbGw9IiMxNjNBNTAiLz4KPHBhdGggZD0iTTE3MC44OTkgMC4wMTA4NDlDMTY2Ljc2OCAwLjAxMDg0OSAxNjIuNDgzIDIuNzA5MTEgMTYyLjQ4MyA4LjIwNTU0QzE2Mi40ODMgMTMuNjY4NyAxNjYuNzY4IDE2LjQyMjUgMTcwLjg5OSAxNi4yNDQ4QzE3NC44MDggMTYuMjQ0OCAxNzguODk0IDEzLjUwMjEgMTc4Ljg5NCA4LjIwNTU0QzE3OC44OTQgMi45MDg5OCAxNzQuODA4IDAuMjEwNzIgMTcwLjg5OSAwLjAxMDg0OVpNMTc1LjkyOSA4LjIwNTU0QzE3NS45MjkgMTEuMDkyNiAxNzMuNTg3IDEzLjQzNTUgMTcwLjY5OSAxMy40MzU1QzE2Ny44MTIgMTMuNDM1NSAxNjUuNDY5IDExLjA5MjYgMTY1LjQ2OSA4LjIwNTU0QzE2NS40NjkgNS4zMTg1MiAxNjcuODEyIDIuOTc1NiAxNzAuNjk5IDIuOTc1NkMxNzMuNTg3IDIuOTc1NiAxNzUuOTI5IDUuMzE4NTIgMTc1LjkyOSA4LjIwNTU0WiIgZmlsbD0iIzE2M0E1MCIvPgo8cGF0aCBkPSJNMTMxLjQ5MSA2LjY1MDM5SDEyNy40NzdWOS42MzczN0gxMzEuNDkxQzEzMy41MSA5LjYzNzM3IDEzMy41MSA2LjY1MDM5IDEzMS40OTEgNi42NTAzOVoiIGZpbGw9IiMxNjNBNTAiLz4KPHBhdGggZD0iTTY5LjUyODUgMzUuMjYzN1YyNi44MDM3SDcyLjY3MjVDNzMuNjE2NSAyNi44MDM3IDc0LjQxNjUgMjYuOTY3NyA3NS4wNzI1IDI3LjI5NTdDNzUuNzM2NSAyNy42MjM3IDc2LjI0MDUgMjguMTAzNyA3Ni41ODQ1IDI4LjczNTdDNzYuOTM2NSAyOS4zNTk3IDc3LjExMjUgMzAuMTIzNyA3Ny4xMTI1IDMxLjAyNzdDNzcuMTEyNSAzMS45MzE3IDc2LjkzNjUgMzIuNjk5NyA3Ni41ODQ1IDMzLjMzMTdDNzYuMjQwNSAzMy45NjM3IDc1LjczNjUgMzQuNDQzNyA3NS4wNzI1IDM0Ljc3MTdDNzQuNDE2NSAzNS4wOTk3IDczLjYxNjUgMzUuMjYzNyA3Mi42NzI1IDM1LjI2MzdINjkuNTI4NVpNNzEuMDY0NSAzMy45OTE3SDcyLjU3NjVDNzMuNTYwNSAzMy45OTE3IDc0LjI5MjUgMzMuNzQ3NyA3NC43NzI1IDMzLjI1OTdDNzUuMjYwNSAzMi43NjM3IDc1LjUwNDUgMzIuMDE5NyA3NS41MDQ1IDMxLjAyNzdDNzUuNTA0NSAzMC4wMzU3IDc1LjI2MDUgMjkuMjk1NyA3NC43NzI1IDI4LjgwNzdDNzQuMjg0NSAyOC4zMTk3IDczLjU1MjUgMjguMDc1NyA3Mi41NzY1IDI4LjA3NTdINzEuMDY0NVYzMy45OTE3Wk03OC42NjkxIDM1LjI2MzdWMjYuODAzN0g4NC4yOTcxVjI4LjAyNzdIODAuMTQ1MVYzMC4zNTU3SDg0LjAzMzFWMzEuNTc5N0g4MC4xNDUxVjM0LjAzOTdIODQuMjk3MVYzNS4yNjM3SDc4LjY2OTFaTTg4LjUwNjEgMzUuMjYzN0w4NC43MzgxIDI2LjgwMzdIODYuMzgyMUw4OS40NDIxIDMzLjg5NTdIODguOTI2MUw5MS45NzQxIDI2LjgwMzdIOTMuNTU4MUw4OS43OTAxIDM1LjI2MzdIODguNTA2MVpNMTAxLjUxOSAzNS4zODM3QzEwMC42MzkgMzUuMzgzNyA5OS44ODMyIDM1LjIwNzcgOTkuMjUxMiAzNC44NTU3Qzk4LjYyNzIgMzQuNDk1NyA5OC4xNDcyIDMzLjk5MTcgOTcuODExMiAzMy4zNDM3Qzk3LjQ3NTIgMzIuNjg3NyA5Ny4zMDcyIDMxLjkxNTcgOTcuMzA3MiAzMS4wMjc3Qzk3LjMwNzIgMzAuMTM5NyA5Ny40NzUyIDI5LjM3MTcgOTcuODExMiAyOC43MjM3Qzk4LjE0NzIgMjguMDc1NyA5OC42MjcyIDI3LjU3NTcgOTkuMjUxMiAyNy4yMjM3Qzk5Ljg4MzIgMjYuODYzNyAxMDAuNjM5IDI2LjY4MzcgMTAxLjUxOSAyNi42ODM3QzEwMi4wODcgMjYuNjgzNyAxMDIuNjIzIDI2Ljc3MTcgMTAzLjEyNyAyNi45NDc3QzEwMy42MzkgMjcuMTIzNyAxMDQuMDU5IDI3LjM3NTcgMTA0LjM4NyAyNy43MDM3TDEwMy44ODMgMjguOTI3N0MxMDMuNTIzIDI4LjYyMzcgMTAzLjE1NSAyOC40MDM3IDEwMi43NzkgMjguMjY3N0MxMDIuNDAzIDI4LjEyMzcgMTAxLjk5OSAyOC4wNTE3IDEwMS41NjcgMjguMDUxN0MxMDAuNzExIDI4LjA1MTcgMTAwLjA1OSAyOC4zMTE3IDk5LjYxMTIgMjguODMxN0M5OS4xNjMyIDI5LjM0MzcgOTguOTM5MiAzMC4wNzU3IDk4LjkzOTIgMzEuMDI3N0M5OC45MzkyIDMxLjk3OTcgOTkuMTYzMiAzMi43MTU3IDk5LjYxMTIgMzMuMjM1N0MxMDAuMDU5IDMzLjc1NTcgMTAwLjcxMSAzNC4wMTU3IDEwMS41NjcgMzQuMDE1N0MxMDEuOTk5IDM0LjAxNTcgMTAyLjQwMyAzMy45NDc3IDEwMi43NzkgMzMuODExN0MxMDMuMTU1IDMzLjY2NzcgMTAzLjUyMyAzMy40NDM3IDEwMy44ODMgMzMuMTM5N0wxMDQuMzg3IDM0LjM2MzdDMTA0LjA1OSAzNC42ODM3IDEwMy42MzkgMzQuOTM1NyAxMDMuMTI3IDM1LjExOTdDMTAyLjYyMyAzNS4yOTU3IDEwMi4wODcgMzUuMzgzNyAxMDEuNTE5IDM1LjM4MzdaTTEwOS4yNSAzNS4zODM3QzEwOC42MzQgMzUuMzgzNyAxMDguMDc0IDM1LjI4MzcgMTA3LjU3IDM1LjA4MzdDMTA3LjA3NCAzNC44NzU3IDEwNi42NDYgMzQuNTc5NyAxMDYuMjg2IDM0LjE5NTdDMTA1LjkzNCAzMy44MTE3IDEwNS42NjIgMzMuMzUxNyAxMDUuNDcgMzIuODE1N0MxMDUuMjc4IDMyLjI3OTcgMTA1LjE4MiAzMS42ODM3IDEwNS4xODIgMzEuMDI3N0MxMDUuMTgyIDMwLjM2MzcgMTA1LjI3OCAyOS43Njc3IDEwNS40NyAyOS4yMzk3QzEwNS42NjIgMjguNzAzNyAxMDUuOTM0IDI4LjI0NzcgMTA2LjI4NiAyNy44NzE3QzEwNi42NDYgMjcuNDg3NyAxMDcuMDc0IDI3LjE5NTcgMTA3LjU3IDI2Ljk5NTdDMTA4LjA3NCAyNi43ODc3IDEwOC42MzQgMjYuNjgzNyAxMDkuMjUgMjYuNjgzN0MxMDkuODY2IDI2LjY4MzcgMTEwLjQyMiAyNi43ODc3IDExMC45MTggMjYuOTk1N0MxMTEuNDIyIDI3LjE5NTcgMTExLjg1IDI3LjQ4MzcgMTEyLjIwMiAyNy44NTk3QzExMi41NjIgMjguMjM1NyAxMTIuODM4IDI4LjY5MTcgMTEzLjAzIDI5LjIyNzdDMTEzLjIyMiAyOS43NTU3IDExMy4zMTggMzAuMzUxNyAxMTMuMzE4IDMxLjAxNTdDMTEzLjMxOCAzMS42Nzk3IDExMy4yMjIgMzIuMjc5NyAxMTMuMDMgMzIuODE1N0MxMTIuODM4IDMzLjM1MTcgMTEyLjU2MiAzMy44MTE3IDExMi4yMDIgMzQuMTk1N0MxMTEuODUgMzQuNTc5NyAxMTEuNDIyIDM0Ljg3NTcgMTEwLjkxOCAzNS4wODM3QzExMC40MjIgMzUuMjgzNyAxMDkuODY2IDM1LjM4MzcgMTA5LjI1IDM1LjM4MzdaTTEwOS4yNSAzNC4wNjM3QzEwOS43NyAzNC4wNjM3IDExMC4yMSAzMy45NDM3IDExMC41NyAzMy43MDM3QzExMC45MzggMzMuNDYzNyAxMTEuMjE4IDMzLjExNTcgMTExLjQxIDMyLjY1OTdDMTExLjYxIDMyLjIwMzcgMTExLjcxIDMxLjY1OTcgMTExLjcxIDMxLjAyNzdDMTExLjcxIDMwLjM4NzcgMTExLjYxNCAyOS44NDM3IDExMS40MjIgMjkuMzk1N0MxMTEuMjMgMjguOTM5NyAxMTAuOTUgMjguNTk1NyAxMTAuNTgyIDI4LjM2MzdDMTEwLjIxNCAyOC4xMjM3IDEwOS43NyAyOC4wMDM3IDEwOS4yNSAyOC4wMDM3QzEwOC43MzggMjguMDAzNyAxMDguMjk4IDI4LjEyMzcgMTA3LjkzIDI4LjM2MzdDMTA3LjU2MiAyOC41OTU3IDEwNy4yNzggMjguOTM5NyAxMDcuMDc4IDI5LjM5NTdDMTA2Ljg4NiAyOS44NDM3IDEwNi43OSAzMC4zODc3IDEwNi43OSAzMS4wMjc3QzEwNi43OSAzMS42NTk3IDEwNi44ODYgMzIuMjAzNyAxMDcuMDc4IDMyLjY1OTdDMTA3LjI3OCAzMy4xMTU3IDEwNy41NjIgMzMuNDYzNyAxMDcuOTMgMzMuNzAzN0MxMDguMjk4IDMzLjk0MzcgMTA4LjczOCAzNC4wNjM3IDEwOS4yNSAzNC4wNjM3Wk0xMTQuODggMzUuMjYzN1YyNi44MDM3SDExNi4wMzJMMTIwLjg5MiAzMy4xMTU3SDEyMC41OFYyNi44MDM3SDEyMi4wMDhWMzUuMjYzN0gxMjAuODY4TDExNi4wMDggMjguOTM5N0gxMTYuMzA4VjM1LjI2MzdIMTE0Ljg4Wk0xMjYuNzczIDM1LjM4MzdDMTI2LjMzMyAzNS4zODM3IDEyNS45MDkgMzUuMzQzNyAxMjUuNTAxIDM1LjI2MzdDMTI1LjEwMSAzNS4xOTE3IDEyNC43MjkgMzUuMDgzNyAxMjQuMzg1IDM0LjkzOTdDMTI0LjA0OSAzNC43OTU3IDEyMy43NDkgMzQuNjIzNyAxMjMuNDg1IDM0LjQyMzdMMTIzLjk1MyAzMy4yMTE3QzEyNC4yMTcgMzMuMzk1NyAxMjQuNDkzIDMzLjU1NTcgMTI0Ljc4MSAzMy42OTE3QzEyNS4wNzcgMzMuODE5NyAxMjUuMzg5IDMzLjkxOTcgMTI1LjcxNyAzMy45OTE3QzEyNi4wNTMgMzQuMDU1NyAxMjYuNDA1IDM0LjA4NzcgMTI2Ljc3MyAzNC4wODc3QzEyNy40MDUgMzQuMDg3NyAxMjcuODY1IDMzLjk4MzcgMTI4LjE1MyAzMy43NzU3QzEyOC40NDEgMzMuNTU5NyAxMjguNTg1IDMzLjI4MzcgMTI4LjU4NSAzMi45NDc3QzEyOC41ODUgMzIuNzYzNyAxMjguNTQxIDMyLjYwNzcgMTI4LjQ1MyAzMi40Nzk3QzEyOC4zNjUgMzIuMzQzNyAxMjguMjIxIDMyLjIyNzcgMTI4LjAyMSAzMi4xMzE3QzEyNy44MjEgMzIuMDM1NyAxMjcuNTU3IDMxLjk1NTcgMTI3LjIyOSAzMS44OTE3TDEyNS45MDkgMzEuNjE1N0MxMjUuMTQ5IDMxLjQ1NTcgMTI0LjU4MSAzMS4xODc3IDEyNC4yMDUgMzAuODExN0MxMjMuODM3IDMwLjQyNzcgMTIzLjY1MyAyOS45MjM3IDEyMy42NTMgMjkuMjk5N0MxMjMuNjUzIDI4Ljc3MTcgMTIzLjc5MyAyOC4zMTE3IDEyNC4wNzMgMjcuOTE5N0MxMjQuMzUzIDI3LjUyNzcgMTI0Ljc0MSAyNy4yMjM3IDEyNS4yMzcgMjcuMDA3N0MxMjUuNzMzIDI2Ljc5MTcgMTI2LjMwNSAyNi42ODM3IDEyNi45NTMgMjYuNjgzN0MxMjcuMzM3IDI2LjY4MzcgMTI3LjcwNSAyNi43MjM3IDEyOC4wNTcgMjYuODAzN0MxMjguNDE3IDI2Ljg3NTcgMTI4Ljc0NSAyNi45ODc3IDEyOS4wNDEgMjcuMTM5N0MxMjkuMzQ1IDI3LjI4MzcgMTI5LjYwOSAyNy40NTk3IDEyOS44MzMgMjcuNjY3N0wxMjkuMzY1IDI4LjgxOTdDMTI5LjAyOSAyOC41Mzk3IDEyOC42NjEgMjguMzMxNyAxMjguMjYxIDI4LjE5NTdDMTI3Ljg2MSAyOC4wNTE3IDEyNy40MjEgMjcuOTc5NyAxMjYuOTQxIDI3Ljk3OTdDMTI2LjU3MyAyNy45Nzk3IDEyNi4yNTcgMjguMDMxNyAxMjUuOTkzIDI4LjEzNTdDMTI1LjcyOSAyOC4yMzk3IDEyNS41MjUgMjguMzg3NyAxMjUuMzgxIDI4LjU3OTdDMTI1LjI0NSAyOC43NjM3IDEyNS4xNzcgMjguOTgzNyAxMjUuMTc3IDI5LjIzOTdDMTI1LjE3NyAyOS41Mjc3IDEyNS4yNzMgMjkuNzU5NyAxMjUuNDY1IDI5LjkzNTdDMTI1LjY1NyAzMC4xMDM3IDEyNS45ODUgMzAuMjM1NyAxMjYuNDQ5IDMwLjMzMTdMMTI3Ljc1NyAzMC42MDc3QzEyOC41NDkgMzAuNzc1NyAxMjkuMTM3IDMxLjAzOTcgMTI5LjUyMSAzMS4zOTk3QzEyOS45MTMgMzEuNzU5NyAxMzAuMTA5IDMyLjIzOTcgMTMwLjEwOSAzMi44Mzk3QzEzMC4xMDkgMzMuMzQzNyAxMjkuOTczIDMzLjc4NzcgMTI5LjcwMSAzNC4xNzE3QzEyOS40MjkgMzQuNTU1NyAxMjkuMDQxIDM0Ljg1NTcgMTI4LjUzNyAzNS4wNzE3QzEyOC4wNDEgMzUuMjc5NyAxMjcuNDUzIDM1LjM4MzcgMTI2Ljc3MyAzNS4zODM3Wk0xMzUuMjE5IDM1LjM4MzdDMTM0LjYwMyAzNS4zODM3IDEzNC4wNDMgMzUuMjgzNyAxMzMuNTM5IDM1LjA4MzdDMTMzLjA0MyAzNC44NzU3IDEzMi42MTUgMzQuNTc5NyAxMzIuMjU1IDM0LjE5NTdDMTMxLjkwMyAzMy44MTE3IDEzMS42MzEgMzMuMzUxNyAxMzEuNDM5IDMyLjgxNTdDMTMxLjI0NyAzMi4yNzk3IDEzMS4xNTEgMzEuNjgzNyAxMzEuMTUxIDMxLjAyNzdDMTMxLjE1MSAzMC4zNjM3IDEzMS4yNDcgMjkuNzY3NyAxMzEuNDM5IDI5LjIzOTdDMTMxLjYzMSAyOC43MDM3IDEzMS45MDMgMjguMjQ3NyAxMzIuMjU1IDI3Ljg3MTdDMTMyLjYxNSAyNy40ODc3IDEzMy4wNDMgMjcuMTk1NyAxMzMuNTM5IDI2Ljk5NTdDMTM0LjA0MyAyNi43ODc3IDEzNC42MDMgMjYuNjgzNyAxMzUuMjE5IDI2LjY4MzdDMTM1LjgzNSAyNi42ODM3IDEzNi4zOTEgMjYuNzg3NyAxMzYuODg3IDI2Ljk5NTdDMTM3LjM5MSAyNy4xOTU3IDEzNy44MTkgMjcuNDgzNyAxMzguMTcxIDI3Ljg1OTdDMTM4LjUzMSAyOC4yMzU3IDEzOC44MDcgMjguNjkxNyAxMzguOTk5IDI5LjIyNzdDMTM5LjE5MSAyOS43NTU3IDEzOS4yODcgMzAuMzUxNyAxMzkuMjg3IDMxLjAxNTdDMTM5LjI4NyAzMS42Nzk3IDEzOS4xOTEgMzIuMjc5NyAxMzguOTk5IDMyLjgxNTdDMTM4LjgwNyAzMy4zNTE3IDEzOC41MzEgMzMuODExNyAxMzguMTcxIDM0LjE5NTdDMTM3LjgxOSAzNC41Nzk3IDEzNy4zOTEgMzQuODc1NyAxMzYuODg3IDM1LjA4MzdDMTM2LjM5MSAzNS4yODM3IDEzNS44MzUgMzUuMzgzNyAxMzUuMjE5IDM1LjM4MzdaTTEzNS4yMTkgMzQuMDYzN0MxMzUuNzM5IDM0LjA2MzcgMTM2LjE3OSAzMy45NDM3IDEzNi41MzkgMzMuNzAzN0MxMzYuOTA3IDMzLjQ2MzcgMTM3LjE4NyAzMy4xMTU3IDEzNy4zNzkgMzIuNjU5N0MxMzcuNTc5IDMyLjIwMzcgMTM3LjY3OSAzMS42NTk3IDEzNy42NzkgMzEuMDI3N0MxMzcuNjc5IDMwLjM4NzcgMTM3LjU4MyAyOS44NDM3IDEzNy4zOTEgMjkuMzk1N0MxMzcuMTk5IDI4LjkzOTcgMTM2LjkxOSAyOC41OTU3IDEzNi41NTEgMjguMzYzN0MxMzYuMTgzIDI4LjEyMzcgMTM1LjczOSAyOC4wMDM3IDEzNS4yMTkgMjguMDAzN0MxMzQuNzA3IDI4LjAwMzcgMTM0LjI2NyAyOC4xMjM3IDEzMy44OTkgMjguMzYzN0MxMzMuNTMxIDI4LjU5NTcgMTMzLjI0NyAyOC45Mzk3IDEzMy4wNDcgMjkuMzk1N0MxMzIuODU1IDI5Ljg0MzcgMTMyLjc1OSAzMC4zODc3IDEzMi43NTkgMzEuMDI3N0MxMzIuNzU5IDMxLjY1OTcgMTMyLjg1NSAzMi4yMDM3IDEzMy4wNDcgMzIuNjU5N0MxMzMuMjQ3IDMzLjExNTcgMTMzLjUzMSAzMy40NjM3IDEzMy44OTkgMzMuNzAzN0MxMzQuMjY3IDMzLjk0MzcgMTM0LjcwNyAzNC4wNjM3IDEzNS4yMTkgMzQuMDYzN1pNMTQwLjg0OSAzNS4yNjM3VjI2LjgwMzdIMTQyLjM4NVYzMy45NTU3SDE0Ni40NDFWMzUuMjYzN0gxNDAuODQ5Wk0xNDcuNTg3IDM1LjI2MzdWMjYuODAzN0gxNTMuMjE1VjI4LjAyNzdIMTQ5LjA2M1YzMC4zNTU3SDE1Mi45NTFWMzEuNTc5N0gxNDkuMDYzVjM0LjAzOTdIMTUzLjIxNVYzNS4yNjM3SDE0Ny41ODdaIiBmaWxsPSIjNEQ0RDREIi8+Cjwvc3ZnPgo=" alt="Jubelio Dev Console">
+      <span class="env">Reviewer Staging</span>
+    </div>
+    <div class="h-right">
+      <div class="vsep hide-sm"></div>
+      <button class="user-btn" type="button" id="userBtn" aria-haspopup="true" aria-expanded="false">
+        <span class="avatar" id="avatar">R</span>
+        <svg class="i chev"><use href="#i-down"/></svg>
+      </button>
+      <div class="menu" id="userMenu" hidden>
+        <div class="menu-head">
+          <span class="avatar sm" id="avatarSm">R</span>
+          <div style="min-width:0;display:grid;gap:4px">
+            <h5 id="menuName">Reviewer</h5>
+            <span id="menuEmail">Email belum diatur</span>
+          </div>
+        </div>
+        <form class="menu-body" id="identityForm">
+          <label for="fbName">Nama reviewer</label>
+          <input class="input" id="fbName" autocomplete="name" placeholder="Nama lengkap">
+          <label for="fbEmail">Email kerja</label>
+          <input class="input" id="fbEmail" type="email" autocomplete="email" placeholder="nama@jubelio.com">
+          <span class="hint">Dicatat di audit trail untuk setiap keputusan. Disimpan di browser ini saja.</span>
+          <button class="btn btn-primary" type="submit">Simpan</button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <div class="frame">
+    <aside aria-label="Navigasi">
+      <nav>
+        <div class="nav-item active" aria-current="page"><svg class="i"><use href="#i-shield"/></svg>Ulasan</div>
+      </nav>
+    </aside>
+
+    <main>
+      <section class="page">
+        <div class="page-head">
+          <h1>Ulasan</h1>
+          <p>Tinjau dan setujui aplikasi, versi aplikasi, dan verifikasi Business Partner yang dikirim developer.</p>
+        </div>
+        <div class="sep"></div>
+
+        <div class="page-body">
+          <div class="alert" id="identityAlert" hidden>
+            <svg class="i"><use href="#i-alert"/></svg>
+            <div><b>Lengkapi email reviewer</b>Tombol Setujui dan Tolak aktif setelah email kerja kamu diatur. <button class="lnk" type="button" id="openIdentity">Atur sekarang</button></div>
+          </div>
+
+          <div class="tabs" role="tablist"><div class="tabs-in" id="tabs"></div></div>
+
+          <div class="toolbar">
+            <div class="tb-left">
+              <div class="search">
+                <svg class="i"><use href="#i-search"/></svg>
+                <input class="input" id="search" type="search" placeholder="Cari nama aplikasi, ID">
+              </div>
+              <div class="filter">
+                <button class="filter-btn" type="button" id="filterBtn" aria-haspopup="true" aria-expanded="false"><svg class="i"><use href="#i-filter"/></svg><span>Filter</span><span class="filter-dot" id="filterDot" hidden>1</span></button>
+                <div class="pop" id="filterPop" role="menu" hidden></div>
+              </div>
+            </div>
+            <div class="tb-right">
+              <button class="icon-btn" type="button" id="refresh" aria-label="Muat ulang"><svg class="i" id="refreshIcon"><use href="#i-rotate"/></svg></button>
+              <div class="vsep-sm"></div>
+              <div class="total"><span>Total</span><span class="total-n" id="total">0</span></div>
+            </div>
+          </div>
+
+          <div id="body"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlgTitle">
+    <div class="dlg-head">
+      <div class="dlg-media" id="dlgMedia"></div>
+      <h2 id="dlgTitle"></h2>
+      <p id="dlgDesc"></p>
+    </div>
+    <div class="dlg-target" id="dlgTarget"></div>
+    <div class="field" id="reasonField">
+      <label for="reason">Alasan penolakan <span>*</span></label>
+      <textarea class="textarea" id="reason" placeholder="Contoh: Scope orders.write tidak sesuai dengan fungsi aplikasi yang dijelaskan."></textarea>
+      <span class="hint">Ditampilkan ke developer sebagai feedback reviewer.</span>
+    </div>
+    <div class="err-text" id="dlgErr" hidden></div>
+    <div class="dlg-foot">
+      <button class="btn btn-outline" type="button" id="dlgCancel">Batal</button>
+      <button class="btn" type="button" id="dlgOk"></button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+const API = "https://dev-console-api.qm-staging-k8s.jubelio.io";
+const DEFAULT_REVIEWER = { name: "Jubelio Reviewer", email: "reviewer@jubelio.com" };
+
+const STATUS = {
+  submitted: ["Diajukan", "#F97316"],
+  in_review: ["Ditinjau", "#F59E0B"],
+  rejected: ["Ditolak", "#EF4444"],
+  ready_to_publish: ["Siap di Publish", "#8B5CF6"],
+  active: ["Aktif", "#22C55E"],
+  pending: ["Menunggu Review", "#F59E0B"],
+  approved: ["Diterima", "#22C55E"],
+};
+
+const TABS = {
+  apps: {
+    label: "Aplikasi",
+    path: "/internal/apps",
+    statuses: ["submitted", "in_review", "rejected", "ready_to_publish"],
+    openLabel: "Antrian terbuka",
+    searchHint: "Cari nama aplikasi, ID",
+    reviewable: (r) => r.status === "submitted" || r.status === "in_review",
+    actionPath: (r) => `/internal/apps/${encodeURIComponent(r.app_code)}`,
+    target: (r) => `<b>${esc(r.name)}</b><span class="mono">${esc(r.app_code)}</span>`,
+    effect: ["Aplikasi pindah ke Siap di Publish dan menunggu developer mem-publish.", "Aplikasi pindah ke Ditolak. Developer bisa memperbaiki lalu mengajukan ulang."],
+    heads: [["Aplikasi"], ["ID Aplikasi", "hide-sm"], ["Developer", "hide-sm"], ["Status", "c"], ["Menunggu", "r"], ["Aksi", "r"]],
+    row: (r) => `
+      <td><div class="app-cell">${logo(r.logo_url, r.name)}<div style="min-width:0"><div class="app-name">${esc(r.name)}</div><div class="app-sub">${esc(r.category_name || "Tanpa kategori")}</div></div></div></td>
+      <td class="hide-sm"><span class="mono">${esc(r.app_code)}</span></td>
+      <td class="hide-sm">${esc(r.developer_email)}</td>
+      <td class="c">${badge(r.status)}</td>
+      <td class="r">${waited(r.submitted_at)}</td>`,
+  },
+  versions: {
+    label: "Versi Aplikasi",
+    path: "/internal/versions",
+    statuses: ["submitted", "in_review", "rejected"],
+    openLabel: "Antrian terbuka",
+    searchHint: "Filter ID Aplikasi, mis. APP-A1B2C3D",
+    searchParam: "app_code",
+    reviewable: (r) => r.status === "submitted" || r.status === "in_review",
+    actionPath: (r) => `/internal/apps/${encodeURIComponent(r.app_code)}/versions/${r.version_id}`,
+    target: (r) => `<b>${esc(r.app_name)} ${esc(r.version_name)}</b><span class="mono">${esc(r.app_code)} · version_id ${r.version_id}</span>`,
+    effect: ["Versi ini menjadi Aktif, yaitu versi yang di-install merchant.", "Versi pindah ke Ditolak dan tetap bisa diedit developer."],
+    heads: [["Aplikasi"], ["Versi"], ["Developer", "hide-sm"], ["Status", "c"], ["Menunggu", "r"], ["Aksi", "r"]],
+    row: (r) => `
+      <td><div class="app-cell">${logo(null, r.app_name)}<div style="min-width:0"><div class="app-name">${esc(r.app_name)}</div><div class="app-sub mono">${esc(r.app_code)}</div></div></div></td>
+      <td><div class="mono fg">${esc(r.version_name)}</div><div class="app-sub">id ${r.version_id}</div></td>
+      <td class="hide-sm">${esc(r.developer_email)}</td>
+      <td class="c">${badge(r.status)}</td>
+      <td class="r">${waited(r.submitted_at)}</td>`,
+  },
+  verifications: {
+    label: "Verifikasi Business Partner",
+    path: "/internal/verifications",
+    statuses: ["pending", "approved", "rejected"],
+    openLabel: "Antrian terbuka",
+    searchHint: "Cari nama perusahaan, email PIC",
+    reviewable: (r) => r.status === "pending",
+    actionPath: (r) => `/internal/verifications/${r.verification_id}`,
+    target: (r) => `<b>${esc(r.company_name)}</b><span class="mono">${esc(r.developer_email)} · verification_id ${r.verification_id}</span>`,
+    effect: ["Verifikasi diterima dan akun developer naik menjadi Business Partner.", "Verifikasi pindah ke Ditolak."],
+    heads: [["Perusahaan"], ["Developer", "hide-sm"], ["Status", "c"], ["Menunggu", "r"], ["Aksi", "r"]],
+    row: (r) => `
+      <td><div class="app-cell">${logo(null, r.company_name)}<div style="min-width:0"><div class="app-name">${esc(r.company_name || "Tanpa nama")}</div><div class="app-sub">verification_id ${r.verification_id} · developer_id ${r.developer_id}</div></div></div></td>
+      <td class="hide-sm">${esc(r.developer_email)}</td>
+      <td class="c">${badge(r.status)}</td>
+      <td class="r">${waited(r.submitted_at)}</td>`,
+  },
+};
+
+const state = { tab: "apps", status: "", search: "", page: 1, limit: 20, rows: [], meta: null, loading: false, error: null, reviewer: null, counts: {} };
+let reqSeq = 0;
+let dlg = null;
+const $ = (id) => document.getElementById(id);
+const icon = (n, cls = "") => `<svg class="i ${cls}"><use href="#i-${n}"/></svg>`;
+
+function esc(v) { return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch { return null; } }
+
+function badgeColors(hex) {
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  const ch = (v) => { const n = v / 255; return n <= 0.03928 ? n / 12.92 : ((n + 0.055) / 1.055) ** 2.4; };
+  const lum = 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b);
+  const fg = lum > 0.6 ? `rgb(${Math.round(r * 0.4)},${Math.round(g * 0.4)},${Math.round(b * 0.4)})` : `rgb(${r},${g},${b})`;
+  return { bg: `rgba(${r},${g},${b},0.12)`, fg };
+}
+function badge(s) {
+  const [label, hex] = STATUS[s] || [s, "#3B82F6"];
+  const c = badgeColors(hex);
+  return `<span class="badge" style="background:${c.bg};color:${c.fg}"><i style="background:${c.fg}"></i>${esc(label)}</span>`;
+}
+function logo(url, name) {
+  const initial = esc((name || "?").trim().charAt(0).toUpperCase());
+  if (url && /^https:\/\//.test(url)) return `<img class="app-logo" src="${esc(url)}" alt="" loading="lazy" data-initial="${initial}">`;
+  return `<div class="app-logo">${initial}</div>`;
+}
+function waited(iso) {
+  if (!iso) return `<span class="date">Tanpa tanggal</span>`;
+  const d = new Date(iso);
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  const date = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric" }).format(d);
+  return `<div class="wait ${days >= 7 ? "old" : ""}">${days <= 0 ? "Hari ini" : days + " hari"}</div><div class="date">${date}</div>`;
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, { ...opts, headers: { Accept: "application/json", ...(opts.body ? { "Content-Type": "application/json" } : {}) } });
+  let json = null;
+  try { json = await res.json(); } catch {}
+  if (!res.ok) {
+    const msg = json?.message || json?.error?.message || (Array.isArray(json?.errors) && json.errors.map((e) => e.message || e).join(", ")) || `HTTP ${res.status}`;
+    const err = new Error(msg); err.status = res.status; throw err;
+  }
+  return json;
+}
+
+function renderTabs() {
+  $("tabs").innerHTML = Object.entries(TABS).map(([k, t]) => {
+    const c = state.counts[k];
+    return `<button class="tab" role="tab" type="button" data-tab="${k}" aria-selected="${state.tab === k}">${t.label}${c ? `<span class="tab-count">${c}</span>` : ""}</button>`;
+  }).join("");
+}
+
+function renderFilter() {
+  const t = TABS[state.tab];
+  const opts = [["", t.openLabel], ...t.statuses.map((s) => [s, null])];
+  $("filterPop").innerHTML = `<div class="pop-label">Filter Status</div>` + opts.map(([v, label]) =>
+    `<button class="pop-opt" type="button" role="menuitemradio" data-status="${v}" aria-checked="${state.status === v}"><span class="radio"></span>${label ? esc(label) : badge(v)}</button>`
+  ).join("");
+  $("filterBtn").classList.toggle("on", !!state.status);
+  $("filterDot").hidden = !state.status;
+  $("search").placeholder = t.searchHint;
+  $("search").value = state.search;
+}
+
+function renderBody() {
+  const t = TABS[state.tab];
+  $("refreshIcon").classList.toggle("spin", state.loading);
+  if (state.loading && !state.rows.length) {
+    $("body").innerHTML = `<div class="card loading"><svg class="i spinner spin"><use href="#i-loader"/></svg></div>`;
+    return;
+  }
+  if (state.error) {
+    $("body").innerHTML = `<div class="card state err">${icon("x", "big")}<h3>Gagal memuat data</h3><p>${esc(state.error)}</p><button class="btn btn-outline" type="button" data-retry>Coba lagi</button></div>`;
+    $("total").textContent = "0";
+    return;
+  }
+  const m = state.meta || {};
+  const total = m.total ?? state.rows.length;
+  $("total").textContent = total;
+  if (!state.rows.length) {
+    const open = !state.status && !state.search;
+    $("body").innerHTML = `<div class="card state" style="color:var(--button-muted)">${icon("folder", "big")}<h3 style="color:var(--foreground)">${open ? "Belum ada yang perlu diulas" : "Data tidak ditemukan"}</h3><p>${open ? "Semua pengajuan sudah diproses. Pengajuan baru dari developer akan muncul di sini." : "Coba ubah kata kunci atau filter status."}</p></div>`;
+    return;
+  }
+  const canAct = !!state.reviewer?.email;
+  const dis = canAct ? "" : 'disabled title="Atur email reviewer dulu"';
+  const head = `<thead><tr>${t.heads.map(([h, cls]) => `<th class="${cls || ""}">${h}</th>`).join("")}</tr></thead>`;
+  const rows = state.rows.map((r, i) => {
+    const act = t.reviewable(r)
+      ? `<div class="actions"><button class="btn btn-sm btn-outline" type="button" data-act="reject" data-i="${i}" ${dis}>Tolak</button><button class="btn btn-sm btn-primary" type="button" data-act="approve" data-i="${i}" ${dis}>Setujui</button></div>`
+      : `<div class="done r">Sudah diproses</div>`;
+    return `<tr>${t.row(r)}<td class="r">${act}</td></tr>`;
+  }).join("");
+  const pages = Math.max(1, Math.ceil(total / state.limit));
+  const nums = pageNumbers(state.page, pages).map((p) => p === "..." ? `<span style="padding:0 4px">...</span>` : `<button class="pg-btn pg-num" type="button" data-goto="${p}" ${p === state.page ? 'aria-current="page"' : ""} aria-label="Halaman ${p}">${p}</button>`).join("");
+  $("body").innerHTML = `<div class="card" ${state.loading ? 'aria-busy="true" style="opacity:.6"' : ""}>
+    <div class="table-wrap"><table>${head}<tbody>${rows}</tbody></table></div>
+    <div class="pager">
+      <div class="pager-l"><span class="lbl">Baris per halaman</span><select class="pg-size" id="pgSize" aria-label="Baris per halaman">${[10, 20, 50, 100].map((n) => `<option ${n === state.limit ? "selected" : ""}>${n}</option>`).join("")}</select></div>
+      <div class="pager-m">
+        <button class="pg-btn" type="button" data-goto="1" ${state.page <= 1 ? "disabled" : ""} aria-label="Halaman pertama">${icon("lleft")}</button>
+        <button class="pg-btn" type="button" data-goto="${state.page - 1}" ${state.page <= 1 ? "disabled" : ""} aria-label="Halaman sebelumnya">${icon("left")}</button>
+        ${nums}
+        <button class="pg-btn" type="button" data-goto="${state.page + 1}" ${state.page >= pages ? "disabled" : ""} aria-label="Halaman berikutnya">${icon("right")}</button>
+        <button class="pg-btn" type="button" data-goto="${pages}" ${state.page >= pages ? "disabled" : ""} aria-label="Halaman terakhir">${icon("rright")}</button>
+      </div>
+      <form class="pager-r" id="goForm"><label class="lbl" for="goInput">Pergi ke halaman</label><input class="pg-go" id="goInput" type="number" min="1" max="${pages}" placeholder="${state.page}"></form>
+    </div>
+  </div>`;
+  $("body").querySelectorAll("img.app-logo").forEach((img) => img.addEventListener("error", () => {
+    const d = document.createElement("div"); d.className = "app-logo"; d.textContent = img.dataset.initial; img.replaceWith(d);
+  }, { once: true }));
+}
+
+function pageNumbers(page, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const out = [1], l = Math.max(2, page - 1), r = Math.min(total - 1, page + 1);
+  if (l > 2) out.push("...");
+  for (let p = l; p <= r; p++) out.push(p);
+  if (r < total - 1) out.push("...");
+  out.push(total);
+  return out;
+}
+
+async function load() {
+  const t = TABS[state.tab];
+  const seq = ++reqSeq;
+  state.loading = true; state.error = null; renderBody();
+  const q = new URLSearchParams({ page: state.page, limit: state.limit });
+  if (state.status) q.set("status", state.status);
+  if (state.search.trim()) q.set(t.searchParam || "search", state.search.trim());
+  try {
+    const json = await api(`${t.path}?${q}`);
+    if (seq !== reqSeq) return;
+    state.rows = json?.data || []; state.meta = json?.meta || null;
+  } catch (e) {
+    if (seq !== reqSeq) return;
+    state.rows = []; state.error = e.message === "Failed to fetch" ? "Server tidak bisa dihubungi. Cek koneksi atau status staging." : e.message;
+  }
+  state.loading = false;
+  renderBody();
+}
+
+async function loadCounts() {
+  await Promise.all(Object.entries(TABS).map(async ([k, t]) => {
+    try { const j = await api(`${t.path}?page=1&limit=1`); state.counts[k] = j?.meta?.total ?? null; } catch { state.counts[k] = null; }
+  }));
+  renderTabs();
+}
+
+function switchTab(k) {
+  if (k === state.tab) return;
+  Object.assign(state, { tab: k, status: "", search: "", page: 1, rows: [] });
+  store("rq-tab", k);
+  renderTabs(); renderFilter(); load();
+}
+
+function openDialog(kind, row) {
+  const t = TABS[state.tab];
+  dlg = { kind, row, tab: state.tab };
+  const reject = kind === "reject";
+  $("dlgMedia").innerHTML = reject ? `<span style="color:var(--danger-text)">${icon("x")}</span>` : `<span style="color:#22c55e">${icon("check")}</span>`;
+  $("dlgTitle").textContent = reject ? "Tolak pengajuan ini?" : "Setujui pengajuan ini?";
+  $("dlgDesc").textContent = t.effect[reject ? 1 : 0];
+  $("dlgTarget").innerHTML = t.target(row) + `<span class="hint">Dicatat atas nama ${esc(state.reviewer.name || state.reviewer.email)} (${esc(state.reviewer.email)})</span>`;
+  $("reasonField").hidden = !reject;
+  $("reason").value = "";
+  $("dlgErr").hidden = true;
+  $("dlgOk").className = "btn " + (reject ? "btn-destructive" : "btn-primary");
+  $("dlgOk").textContent = reject ? "Tolak" : "Setujui";
+  $("dlgOk").disabled = false;
+  $("overlay").hidden = false;
+  (reject ? $("reason") : $("dlgOk")).focus();
+}
+function closeDialog() { $("overlay").hidden = true; dlg = null; }
+
+async function submitDialog() {
+  if (!dlg) return;
+  const { kind, row, tab } = dlg;
+  const reviewer = { email: state.reviewer.email };
+  if (state.reviewer.name) reviewer.name = state.reviewer.name;
+  const body = { reviewer };
+  if (kind === "reject") {
+    const reason = $("reason").value.trim();
+    if (!reason) { $("dlgErr").textContent = "Alasan penolakan wajib diisi karena akan dibaca developer."; $("dlgErr").hidden = false; $("reason").focus(); return; }
+    body.rejection_reason = reason;
+  }
+  $("dlgOk").disabled = true; $("dlgOk").textContent = "Memproses...";
+  try {
+    await api(`${TABS[tab].actionPath(row)}/${kind}`, { method: "POST", body: JSON.stringify(body) });
+    closeDialog();
+    toast(kind === "approve" ? "Pengajuan disetujui" : "Pengajuan ditolak", true);
+    load(); loadCounts();
+  } catch (e) {
+    const hint = e.status === 422 ? " Item ini sudah tidak bisa diulas, mungkin sudah diproses reviewer lain." : "";
+    $("dlgErr").textContent = (e.message === "Failed to fetch" ? "Server tidak bisa dihubungi." : e.message) + hint;
+    $("dlgErr").hidden = false;
+    $("dlgOk").disabled = false; $("dlgOk").textContent = kind === "reject" ? "Tolak" : "Setujui";
+  }
+}
+
+let toastTimer;
+function toast(msg, ok) {
+  const el = $("toast");
+  el.innerHTML = icon(ok ? "check" : "x") + `<span>${esc(msg)}</span>`;
+  el.className = "toast " + (ok ? "ok" : "bad"); el.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 3000);
+}
+
+let avatarUrl = null;
+function renderIdentity() {
+  const r = state.reviewer || {};
+  const initial = (r.name || r.email || "R").trim().charAt(0).toUpperCase();
+  for (const el of [$("avatar"), $("avatarSm")]) {
+    el.textContent = "";
+    if (avatarUrl) { const img = document.createElement("img"); img.src = avatarUrl; img.alt = ""; el.append(img); }
+    else el.textContent = initial;
+  }
+  $("menuName").textContent = r.name || "Reviewer";
+  $("menuEmail").textContent = r.email || "Email belum diatur";
+  $("identityAlert").hidden = !!r.email;
+  if (document.activeElement !== $("fbName")) $("fbName").value = r.name || "";
+  if (document.activeElement !== $("fbEmail")) $("fbEmail").value = r.email || "";
+}
+
+function toggleMenu(open) {
+  $("userMenu").hidden = !open;
+  $("userBtn").setAttribute("aria-expanded", open);
+}
+
+async function initIdentity() {
+  let saved = null;
+  try { saved = JSON.parse(store("rq-reviewer") || "null"); } catch {}
+  state.reviewer = saved?.email ? saved : { ...DEFAULT_REVIEWER };
+  renderIdentity(); renderBody();
+  try {
+    const user = await window.claude?.use?.("user");
+    const me = user ? await user.me() : null;
+    if (me) {
+      avatarUrl = me.name ? me.avatarUrl : null;
+      if (me.email) state.reviewer.email = me.email;
+      
+      renderIdentity(); renderBody();
+    }
+  } catch {}
+}
+
+$("tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-tab]"); if (b) switchTab(b.dataset.tab); });
+$("filterBtn").addEventListener("click", (e) => { e.stopPropagation(); const open = $("filterPop").hidden; $("filterPop").hidden = !open; $("filterBtn").setAttribute("aria-expanded", open); });
+$("filterPop").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-status]"); if (!b) return;
+  state.status = b.dataset.status; state.page = 1; $("filterPop").hidden = true; renderFilter(); load();
+});
+let searchTimer;
+$("search").addEventListener("input", (e) => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { state.search = e.target.value; state.page = 1; load(); }, 300); });
+$("refresh").addEventListener("click", () => { load(); loadCounts(); });
+$("body").addEventListener("click", (e) => {
+  if (e.target.closest("[data-retry]")) return load();
+  const g = e.target.closest("[data-goto]");
+  if (g && !g.disabled) { state.page = +g.dataset.goto; return load(); }
+  const b = e.target.closest("[data-act]");
+  if (b && !b.disabled) openDialog(b.dataset.act, state.rows[+b.dataset.i]);
+});
+$("body").addEventListener("change", (e) => { if (e.target.id === "pgSize") { state.limit = +e.target.value; state.page = 1; load(); } });
+$("body").addEventListener("submit", (e) => {
+  if (e.target.id !== "goForm") return;
+  e.preventDefault();
+  const n = parseInt($("goInput").value, 10);
+  const pages = Math.max(1, Math.ceil((state.meta?.total ?? 0) / state.limit));
+  if (n >= 1 && n <= pages) { state.page = n; load(); }
+});
+$("userBtn").addEventListener("click", (e) => { e.stopPropagation(); toggleMenu($("userMenu").hidden); });
+$("openIdentity").addEventListener("click", (e) => { e.stopPropagation(); toggleMenu(true); $("fbEmail").focus(); });
+$("userMenu").addEventListener("click", (e) => e.stopPropagation());
+document.addEventListener("click", () => { toggleMenu(false); $("filterPop").hidden = true; });
+$("identityForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const email = $("fbEmail").value.trim(), name = $("fbName").value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast("Format email belum valid", false); $("fbEmail").focus(); return; }
+  state.reviewer = { email, name };
+  store("rq-reviewer", JSON.stringify(state.reviewer));
+  toggleMenu(false); renderIdentity(); renderBody(); toast("Identitas reviewer disimpan", true);
+});
+$("dlgCancel").addEventListener("click", closeDialog);
+$("dlgOk").addEventListener("click", submitDialog);
+$("overlay").addEventListener("click", (e) => { if (e.target === $("overlay")) closeDialog(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { if (!$("overlay").hidden) closeDialog(); toggleMenu(false); $("filterPop").hidden = true; } });
+
+const savedTab = store("rq-tab");
+if (savedTab && TABS[savedTab]) state.tab = savedTab;
+if (TABS[location.hash.slice(1)]) state.tab = location.hash.slice(1);
+renderTabs(); renderFilter(); initIdentity(); load(); loadCounts();
+</script>
