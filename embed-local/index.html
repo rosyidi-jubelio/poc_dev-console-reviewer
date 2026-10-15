@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Embed Local PoC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,300..900&display=swap">
+<style>
+  :root {
+    --background: #ffffff;
+    --surface: #f6f8fa;
+    --foreground: #163a50;
+    --primary: #4b68ef;
+    --primary-fg: #fbfbfb;
+    --muted: #6b7c88;
+    --border: #eceff1;
+    --sidebar: #163a50;
+    --sidebar-fg: #c9d6df;
+    --log-bg: #0d1117;
+    --log-fg: #9fef00;
+    --warn: #f0b429;
+    --bad: #ff6b6b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: #11161b;
+      --surface: #182028;
+      --foreground: #e3ebf1;
+      --muted: #8c9ba6;
+      --border: #26313b;
+      --sidebar: #0b1014;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font: 14px/1.45 "Nunito Sans", system-ui, sans-serif;
+    background: var(--background);
+    color: var(--foreground);
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  header strong { margin-right: 4px; }
+  .origin { color: var(--muted); font-size: 12px; }
+  .bar { display: flex; flex: 1 1 420px; gap: 8px; min-width: 0; }
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: inherit;
+    font: inherit;
+  }
+  button {
+    padding: 7px 12px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--primary);
+    color: var(--primary-fg);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button.ghost { background: var(--surface); color: var(--foreground); border: 1px solid var(--border); font-weight: 400; }
+  main { flex: 1; display: flex; min-height: 0; }
+  aside { width: 190px; background: var(--sidebar); color: var(--sidebar-fg); padding: 16px 10px; flex-shrink: 0; }
+  aside div { padding: 7px 10px; border-radius: 6px; }
+  aside .on { background: rgba(255,255,255,.1); color: #fff; }
+  .frame { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+  details { border-top: 1px solid var(--border); background: var(--surface); }
+  summary { padding: 8px 16px; cursor: pointer; font-weight: 600; }
+  details pre { margin: 0 16px 12px; padding: 10px; overflow: auto; background: var(--background); border: 1px solid var(--border); border-radius: 8px; font: 12px/1.5 ui-monospace, monospace; }
+  #log { height: 150px; overflow: auto; margin: 0; padding: 8px 16px; background: var(--log-bg); color: var(--log-fg); font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap; }
+  #log .warn { color: var(--warn); }
+  #log .bad { color: var(--bad); }
+  @media (max-width: 720px) { aside { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  <strong>Jubelio Admin (simulasi)</strong>
+  <span class="origin" id="self-origin"></span>
+  <div class="bar">
+    <input id="url" value="http://localhost:3000" aria-label="Launch URL">
+    <button id="load">Load</button>
+    <button class="ghost" data-url="http://localhost:3000">http</button>
+    <button class="ghost" data-url="https://localhost:3000">https</button>
+  </div>
+</header>
+<main>
+  <aside><div>Dashboard</div><div>Pesanan</div><div class="on">Apps › Local App</div></aside>
+  <div class="frame">
+    <iframe id="app" title="Embedded app" allow="clipboard-write"></iframe>
+    <details>
+      <summary>Snippet untuk app di localhost (uji postMessage session token)</summary>
+      <pre id="snippet"></pre>
+    </details>
+    <pre id="log"></pre>
+  </div>
+</main>
+<script>
+  const urlInput = document.getElementById('url');
+  const iframe = document.getElementById('app');
+  const logEl = document.getElementById('log');
+  let launchOrigin = '';
+
+  document.getElementById('self-origin').textContent = location.origin;
+  document.getElementById('snippet').textContent =
+`window.addEventListener('message', (e) => {
+  if (e.origin !== '${location.origin}') return;
+  if (e.data?.type === 'session-token:response') console.log('token', e.data.token);
+});
+window.parent.postMessage({ type: 'session-token:request' }, '${location.origin}');`;
+
+  function log(msg, cls) {
+    const line = document.createElement('div');
+    if (cls) line.className = cls;
+    line.textContent = new Date().toLocaleTimeString() + '  ' + msg;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function load() {
+    let parsed;
+    try {
+      parsed = new URL(urlInput.value);
+    } catch {
+      log('URL tidak valid', 'bad');
+      return;
+    }
+    launchOrigin = parsed.origin;
+    if (location.protocol === 'https:' && parsed.protocol === 'http:') {
+      log('parent https memuat iframe http: Safari biasanya memblokir (mixed content)', 'warn');
+    }
+    iframe.src = parsed.href;
+    log('load iframe ' + parsed.href + ', origin yang diizinkan ' + launchOrigin);
+  }
+
+  iframe.addEventListener('load', () => {
+    if (iframe.src) log('event load dari iframe, cek tampilan: halaman app atau halaman error browser');
+  });
+
+  window.addEventListener('message', (event) => {
+    if (event.origin !== launchOrigin || event.source !== iframe.contentWindow) {
+      log('DITOLAK pesan dari origin ' + event.origin, 'bad');
+      return;
+    }
+    if (event.data && event.data.type === 'session-token:request') {
+      const payload = { sub: 'user-1', tenant_id: 'tenant-demo', exp: Math.floor(Date.now() / 1000) + 120 };
+      const token = 'FAKE.' + btoa(JSON.stringify(payload)) + '.SIG';
+      event.source.postMessage({ type: 'session-token:response', token }, launchOrigin);
+      log('kirim session token palsu ke ' + launchOrigin);
+    } else {
+      log('pesan dari iframe: ' + JSON.stringify(event.data));
+    }
+  });
+
+  document.getElementById('load').addEventListener('click', load);
+  urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); });
+  document.querySelectorAll('button[data-url]').forEach((b) => {
+    b.addEventListener('click', () => { urlInput.value = b.dataset.url; load(); });
+  });
+
+  const preset = new URLSearchParams(location.search).get('url');
+  if (preset) urlInput.value = preset;
+  load();
+</script>
+</body>
+</html>
