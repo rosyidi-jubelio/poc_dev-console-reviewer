@@ -347,8 +347,13 @@ const STATUS = {
   rejected: ["Ditolak", "#EF4444"],
   ready_to_publish: ["Siap di Publish", "#8B5CF6"],
   active: ["Aktif", "#22C55E"],
-  pending: ["Menunggu Review", "#F59E0B"],
   approved: ["Diterima", "#22C55E"],
+};
+
+const KINDS = {
+  start: { path: "start-review", title: "Tandai sedang ditinjau?", ok: "Mulai Tinjau", cls: "btn-primary", media: `<span style="color:var(--primary)"><svg class="i"><use href="#i-search"/></svg></span>`, toast: "Status diubah jadi Ditinjau", effect: 2 },
+  approve: { path: "approve", title: "Setujui pengajuan ini?", ok: "Setujui", cls: "btn-primary", media: `<span style="color:#22c55e"><svg class="i"><use href="#i-check"/></svg></span>`, toast: "Pengajuan disetujui", effect: 0 },
+  reject: { path: "reject", title: "Tolak pengajuan ini?", ok: "Tolak", cls: "btn-destructive", media: `<span style="color:var(--danger-text)"><svg class="i"><use href="#i-x"/></svg></span>`, toast: "Pengajuan ditolak", effect: 1 },
 };
 
 const TABS = {
@@ -358,10 +363,11 @@ const TABS = {
     statuses: ["submitted", "in_review", "rejected", "ready_to_publish"],
     openLabel: "Antrian terbuka",
     searchHint: "Cari nama aplikasi, ID",
-    reviewable: (r) => r.status === "submitted" || r.status === "in_review",
+    reviewable: (r) => r.status === "in_review",
+    startable: (r) => r.status === "submitted",
     actionPath: (r) => `/internal/apps/${encodeURIComponent(r.app_code)}`,
     target: (r) => `<b>${esc(r.name)}</b><span class="mono">${esc(r.app_code)}</span>`,
-    effect: ["Aplikasi pindah ke Siap di Publish dan menunggu developer mem-publish.", "Aplikasi pindah ke Ditolak. Developer bisa memperbaiki lalu mengajukan ulang."],
+    effect: ["Aplikasi pindah ke Siap di Publish dan menunggu developer mem-publish.", "Aplikasi pindah ke Ditolak. Developer bisa memperbaiki lalu mengajukan ulang.", "Aplikasi pindah ke Ditinjau, menandakan reviewer sedang memeriksanya. Setujui atau tolak baru bisa dilakukan setelahnya."],
     heads: [["Aplikasi"], ["ID Aplikasi", "hide-sm"], ["Developer", "hide-sm"], ["Status", "c"], ["Menunggu", "r"], ["Aksi", "r"]],
     row: (r) => `
       <td><div class="app-cell">${logo(r.logo_url, r.name)}<div style="min-width:0"><div class="app-name">${esc(r.name)}</div><div class="app-sub">${esc(r.category_name || "Tanpa kategori")}</div></div></div></td>
@@ -377,10 +383,11 @@ const TABS = {
     openLabel: "Antrian terbuka",
     searchHint: "Filter ID Aplikasi, mis. APP-A1B2C3D",
     searchParam: "app_code",
-    reviewable: (r) => r.status === "submitted" || r.status === "in_review",
+    reviewable: (r) => r.status === "in_review",
+    startable: (r) => r.status === "submitted",
     actionPath: (r) => `/internal/apps/${encodeURIComponent(r.app_code)}/versions/${r.version_id}`,
     target: (r) => `<b>${esc(r.app_name)} ${esc(r.version_name)}</b><span class="mono">${esc(r.app_code)} · version_id ${r.version_id}</span>`,
-    effect: ["Versi ini menjadi Aktif, yaitu versi yang di-install merchant.", "Versi pindah ke Ditolak dan tetap bisa diedit developer."],
+    effect: ["Versi ini menjadi Aktif, yaitu versi yang di-install merchant.", "Versi pindah ke Ditolak dan tetap bisa diedit developer.", "Versi pindah ke Ditinjau, menandakan reviewer sedang memeriksanya. Setujui atau tolak baru bisa dilakukan setelahnya."],
     heads: [["Aplikasi"], ["Versi"], ["Developer", "hide-sm"], ["Status", "c"], ["Menunggu", "r"], ["Aksi", "r"]],
     row: (r) => `
       <td><div class="app-cell">${logo(null, r.app_name)}<div style="min-width:0"><div class="app-name">${esc(r.app_name)}</div><div class="app-sub mono">${esc(r.app_code)}</div></div></div></td>
@@ -392,13 +399,14 @@ const TABS = {
   verifications: {
     label: "Verifikasi Business Partner",
     path: "/internal/verifications",
-    statuses: ["pending", "approved", "rejected"],
+    statuses: ["submitted", "in_review", "approved", "rejected"],
     openLabel: "Antrian terbuka",
     searchHint: "Cari nama perusahaan, email PIC",
-    reviewable: (r) => r.status === "pending",
+    reviewable: (r) => r.status === "in_review",
+    startable: (r) => r.status === "submitted",
     actionPath: (r) => `/internal/verifications/${r.verification_id}`,
     target: (r) => `<b>${esc(r.company_name)}</b><span class="mono">${esc(r.developer_email)} · verification_id ${r.verification_id}</span>`,
-    effect: ["Verifikasi diterima dan akun developer naik menjadi Business Partner.", "Verifikasi pindah ke Ditolak."],
+    effect: ["Verifikasi diterima dan akun developer naik menjadi Business Partner.", "Verifikasi pindah ke Ditolak.", "Verifikasi pindah ke Ditinjau, menandakan reviewer sedang memeriksa dokumennya. Setujui atau tolak baru bisa dilakukan setelahnya."],
     heads: [["Perusahaan"], ["Developer", "hide-sm"], ["Status", "c"], ["Menunggu", "r"], ["Aksi", "r"]],
     row: (r) => `
       <td><div class="app-cell">${logo(null, r.company_name)}<div style="min-width:0"><div class="app-name">${esc(r.company_name || "Tanpa nama")}</div><div class="app-sub">verification_id ${r.verification_id} · developer_id ${r.developer_id}</div></div></div></td>
@@ -496,7 +504,9 @@ function renderBody() {
   const dis = canAct ? "" : 'disabled title="Atur email reviewer dulu"';
   const head = `<thead><tr>${t.heads.map(([h, cls]) => `<th class="${cls || ""}">${h}</th>`).join("")}</tr></thead>`;
   const rows = state.rows.map((r, i) => {
-    const act = t.reviewable(r)
+    const act = t.startable(r)
+      ? `<div class="actions"><button class="btn btn-sm btn-primary" type="button" data-act="start" data-i="${i}" ${dis}>Mulai Tinjau</button></div>`
+      : t.reviewable(r)
       ? `<div class="actions"><button class="btn btn-sm btn-outline" type="button" data-act="reject" data-i="${i}" ${dis}>Tolak</button><button class="btn btn-sm btn-primary" type="button" data-act="approve" data-i="${i}" ${dis}>Setujui</button></div>`
       : `<div class="done r">Sudah diproses</div>`;
     return `<tr>${t.row(r)}<td class="r">${act}</td></tr>`;
@@ -568,16 +578,17 @@ function switchTab(k) {
 function openDialog(kind, row) {
   const t = TABS[state.tab];
   dlg = { kind, row, tab: state.tab };
+  const k = KINDS[kind];
   const reject = kind === "reject";
-  $("dlgMedia").innerHTML = reject ? `<span style="color:var(--danger-text)">${icon("x")}</span>` : `<span style="color:#22c55e">${icon("check")}</span>`;
-  $("dlgTitle").textContent = reject ? "Tolak pengajuan ini?" : "Setujui pengajuan ini?";
-  $("dlgDesc").textContent = t.effect[reject ? 1 : 0];
+  $("dlgMedia").innerHTML = k.media;
+  $("dlgTitle").textContent = k.title;
+  $("dlgDesc").textContent = t.effect[k.effect];
   $("dlgTarget").innerHTML = t.target(row) + `<span class="hint">Dicatat atas nama ${esc(state.reviewer.name || state.reviewer.email)} (${esc(state.reviewer.email)})</span>`;
   $("reasonField").hidden = !reject;
   $("reason").value = "";
   $("dlgErr").hidden = true;
-  $("dlgOk").className = "btn " + (reject ? "btn-destructive" : "btn-primary");
-  $("dlgOk").textContent = reject ? "Tolak" : "Setujui";
+  $("dlgOk").className = "btn " + k.cls;
+  $("dlgOk").textContent = k.ok;
   $("dlgOk").disabled = false;
   $("overlay").hidden = false;
   (reject ? $("reason") : $("dlgOk")).focus();
@@ -597,15 +608,15 @@ async function submitDialog() {
   }
   $("dlgOk").disabled = true; $("dlgOk").textContent = "Memproses...";
   try {
-    await api(`${TABS[tab].actionPath(row)}/${kind}`, { method: "POST", body: JSON.stringify(body) });
+    await api(`${TABS[tab].actionPath(row)}/${KINDS[kind].path}`, { method: "POST", body: JSON.stringify(body) });
     closeDialog();
-    toast(kind === "approve" ? "Pengajuan disetujui" : "Pengajuan ditolak", true);
+    toast(KINDS[kind].toast, true);
     load(); loadCounts();
   } catch (e) {
     const hint = e.status === 422 ? " Item ini sudah tidak bisa diulas, mungkin sudah diproses reviewer lain." : "";
     $("dlgErr").textContent = (e.message === "Failed to fetch" ? "Server tidak bisa dihubungi." : e.message) + hint;
     $("dlgErr").hidden = false;
-    $("dlgOk").disabled = false; $("dlgOk").textContent = kind === "reject" ? "Tolak" : "Setujui";
+    $("dlgOk").disabled = false; $("dlgOk").textContent = KINDS[kind].ok;
   }
 }
 
